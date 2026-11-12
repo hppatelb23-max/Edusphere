@@ -1,0 +1,60 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+      color-scheme: light dark;
+    }
+  }
+  
+  body {
+    transition: background-color 0.3s, color 0.3s;
+  }
+  /* Add custom animations */
+@layer utilities {
+    .animation-range {
+      animation-timeline: view() range(entry 0);
+    }
+}
+
+/* Ensure MetaMask SDK modal / overlay is always centered in the middle in a medium-sized box */
+mm-select-modal,
+mm-install-modal,
+mm-pending-modal,
+#metamask-sdk-modal,
+[id*="metamask-sdk"],
+[id*="metamask"],
+.metamask-sdk-modal,
+div[class*="mm-modal"],
+div[data-testid="rk-connect-modal"] {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  bottom: auto !important;
+  right: auto !important;
+  max-height: 85vh !important;
+  max-width: 90vw !important;
+  width: 440px !important;
+  overflow-y: auto !important;
+  z-index: 99999999 !important;
+  margin: 0 !important;
+  border-radius: 24px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75) !important;
+}
+
+iframe[id*="metamask-sdk"],
+iframe[src*="metamask"] {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  bottom: auto !important;
+  right: auto !important;
+  max-height: 85vh !important;
+  max-width: 90vw !important;
+  width: 440px !important;
+  z-index: 99999999 !important;
+}
