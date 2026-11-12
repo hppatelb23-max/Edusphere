@@ -16,16 +16,21 @@ import {
   FiDollarSign,
   FiBook,
   FiGift,
-  FiTrash2
+  FiTrash2,
+  FiEye,
+  FiZoomIn,
+  FiRefreshCw
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
 import { useThemeStore } from "../../store/themeStore";
 import { useTheme } from "next-themes";
-import { fetchAllTests, deleteTest } from "../../utils/testsApi";
+import { fetchAllTests, deleteTest, fetchMySubmissions } from "../../utils/testsApi";
+import ImageZoomModal from "./ImageZoomModal";
 
 const TestList = () => {
   const [tests, setTests] = useState([]);
+  const [studentSubmissions, setStudentSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +63,21 @@ const TestList = () => {
   useEffect(() => {
     loadTests();
   }, []);
+
+  // Fetch student past test submissions for history review badges
+  useEffect(() => {
+    if (!isEducator) {
+      const loadSubmissions = async () => {
+        try {
+          const subs = await fetchMySubmissions(walletAddress);
+          setStudentSubmissions(subs || []);
+        } catch (e) {
+          console.warn("Failed to load student submissions:", e);
+        }
+      };
+      loadSubmissions();
+    }
+  }, [walletAddress, isEducator]);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -195,6 +215,19 @@ const TestList = () => {
               >
                 <FiAward className="w-4 h-4" />
                 <span>Student Marks</span>
+              </Link>
+            </div>
+          )}
+
+          {/* Student shortcuts */}
+          {!isEducator && (
+            <div className="hidden lg:flex items-center gap-2">
+              <Link
+                to="/my-test-marks"
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-400 hover:bg-emerald-500 hover:text-black font-semibold text-sm transition-all"
+              >
+                <FiAward className="w-4 h-4" />
+                <span>My Test History & Review</span>
               </Link>
             </div>
           )}
@@ -473,7 +506,7 @@ const TestList = () => {
                     </div>
                   </div>
 
-                  {/* Card Footer */}
+                    {/* Card Footer */}
                   <div>
                     <div className="flex items-center justify-between text-xs text-gray-400 mb-4 pb-3 border-b border-gray-700/30">
                       <span>By: {test.author_name || "Faculty"}</span>
@@ -482,24 +515,38 @@ const TestList = () => {
                       </span>
                     </div>
 
-                    <button
-                      onClick={() => handleStartTest(test._id)}
-                      className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <FiCheckCircle className="w-4 h-4" />
-                      <span>Take Assessment</span>
-                    </button>
+                    {/* Educators see "View Student Marks" instead of "Take Assessment" */}
+                    {isEducator ? (
+                      <Link
+                        to={`/educator-marks?testId=${encodeURIComponent(test._id || "")}&testTitle=${encodeURIComponent(test.title || "")}`}
+                        className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-black shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                      >
+                        <FiAward className="w-4 h-4" />
+                        <span>View Student Marks</span>
+                      </Link>
+                    ) : (
+                      <button
+                        onClick={() => handleStartTest(test._id)}
+                        className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
+                      >
+                        <FiCheckCircle className="w-4 h-4" />
+                        <span>Take Assessment</span>
+                      </button>
+                    )}
+
                     {isEducator && (
                       <button
                         onClick={async (e) => {
                           e.stopPropagation();
                           if (window.confirm(`Delete "${test.title}"? This cannot be undone.`)) {
+                            setTests((prev) => prev.filter((t) => String(t._id) !== String(test._id)));
                             const result = await deleteTest(test._id, walletAddress);
                             if (result.success) {
                               toast.success("Test deleted successfully!");
                               loadTests();
                             } else {
                               toast.error("Failed to delete test.");
+                              loadTests();
                             }
                           }
                         }}

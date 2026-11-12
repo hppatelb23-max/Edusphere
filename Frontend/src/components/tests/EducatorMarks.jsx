@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiAward,
@@ -20,7 +20,8 @@ import {
   FiDownload,
   FiAlertTriangle,
   FiClock,
-  FiTrash2
+  FiTrash2,
+  FiZoomIn
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
@@ -33,9 +34,14 @@ import {
   clearAllStudentSubmissions
 } from "../../utils/testsApi";
 import { getProctorRecording } from "../../utils/proctorRecordingDB";
+import ImageZoomModal from "./ImageZoomModal";
 
 const EducatorMarks = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const testIdParam = searchParams.get("testId") || "";
+  const testTitleParam = searchParams.get("testTitle") || "";
+
   const { walletAddress, walletConnected, connectWallet } = useWallet();
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
@@ -49,14 +55,22 @@ const EducatorMarks = () => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTest, setFilterTest] = useState("All");
+  const [filterTest, setFilterTest] = useState(testTitleParam || "All");
   const [filterStatus, setFilterStatus] = useState("All"); // All | Passed | Failed
   const [selectedSubmission, setSelectedSubmission] = useState(null); // for mistakes review modal
+  const [zoomImage, setZoomImage] = useState(null); // { src, alt }
   const [recordingModalSub, setRecordingModalSub] = useState(null); // for video recording playback
   const [recordingBlobUrl, setRecordingBlobUrl] = useState(null);
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  // Sync filterTest with URL query parameters when navigating
+  useEffect(() => {
+    if (testTitleParam) {
+      setFilterTest(testTitleParam);
+    }
+  }, [testTitleParam]);
 
   const handleOpenRecording = async (sub) => {
     setRecordingModalSub(sub);
@@ -202,15 +216,76 @@ const EducatorMarks = () => {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  // Clear history for only the currently filtered test
+  const handleClearFilteredTestHistory = async () => {
+    if (filteredSubmissions.length === 0) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete all students' marks and video recordings for "${filterTest}"? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      const filteredIds = new Set(filteredSubmissions.map((s) => s.submission_id || s._id));
+      for (const sub of filteredSubmissions) {
+        const subId = sub.submission_id || sub._id;
+        await deleteStudentSubmission(subId, sub.recording_id);
+      }
+      setSubmissions((prev) => prev.filter((s) => !filteredIds.has(s.submission_id || s._id)));
+      if (selectedSubmission && filteredIds.has(selectedSubmission.submission_id || selectedSubmission._id)) {
+        setSelectedSubmission(null);
+      }
+      if (recordingModalSub && filteredIds.has(recordingModalSub.submission_id || recordingModalSub._id)) {
+        handleCloseRecording();
+      }
+      toast.success(`Marks and recordings for "${filterTest}" have been cleared.`);
+    } catch (err) {
+      console.error("Failed to clear test history:", err);
+      toast.error("Failed to clear marks history.");
+    }
+  };
+
   // Filter calculations
-  const uniqueTestTitles = ["All", ...new Set(submissions.map((s) => s.test_title).filter(Boolean))];
+  const uniqueTestTitles = [
+    "All",
+    ...new Set([
+      ...(testTitleParam ? [testTitleParam] : []),
+      ...submissions.map((s) => s.test_title).filter(Boolean)
+    ])
+  ];
+
+  const handleTestFilterChange = (selectedTitle) => {
+    setFilterTest(selectedTitle);
+    if (selectedTitle === "All") {
+      setSearchParams({});
+    } else {
+      setSearchParams({ testTitle: selectedTitle });
+    }
+  };
+
+  const handleClearTestFilter = () => {
+    setFilterTest("All");
+    setSearchParams({});
+  };
 
   const filteredSubmissions = submissions.filter((sub) => {
     const matchesSearch =
       (sub.student_wallet_id && sub.student_wallet_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (sub.student_name && sub.student_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (sub.test_title && sub.test_title.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    const matchesTest = filterTest === "All" || sub.test_title === filterTest;
+    const matchesTest = (() => {
+      if (filterTest === "All") return true;
+      const target = filterTest.trim().toLowerCase();
+      // Match by title
+      if (sub.test_title && sub.test_title.trim().toLowerCase() === target) {
+        return true;
+      }
+      // Match by test_id if testIdParam is present
+      if (testIdParam && sub.test_id && String(sub.test_id) === String(testIdParam)) {
+        return true;
+      }
+      return false;
+    })();
 
     const matchesStatus =
       filterStatus === "All" ||
@@ -220,13 +295,13 @@ const EducatorMarks = () => {
     return matchesSearch && matchesTest && matchesStatus;
   });
 
-  // Aggregate stats
-  const totalAttempts = submissions.length;
-  const passedAttempts = submissions.filter((s) => s.passed).length;
+  // Aggregate stats calculated specifically for the currently filtered test/view
+  const totalAttempts = filteredSubmissions.length;
+  const passedAttempts = filteredSubmissions.filter((s) => s.passed).length;
   const passRate = totalAttempts > 0 ? Math.round((passedAttempts / totalAttempts) * 100) : 0;
   const avgScore =
     totalAttempts > 0
-      ? Math.round(submissions.reduce((acc, curr) => acc + (curr.score_percentage || 0), 0) / totalAttempts)
+      ? Math.round(filteredSubmissions.reduce((acc, curr) => acc + (curr.score_percentage || 0), 0) / totalAttempts)
       : 0;
 
   return (
@@ -359,14 +434,44 @@ const EducatorMarks = () => {
             <div className="mb-8">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 mb-3">
                 <FiAward className="w-3.5 h-3.5" />
-                Educator Gradebook & Marks Central
+                {filterTest !== "All" ? `Educator Gradebook • ${filterTest}` : "Educator Gradebook & Marks Central"}
               </div>
-              <h1 className="text-4xl font-black mb-2">Student Test Results & Mistakes</h1>
+              <h1 className="text-4xl font-black mb-2">
+                {filterTest !== "All" ? `Assessment Marks: ${filterTest}` : "Student Test Results & Mistakes"}
+              </h1>
               <p className={`text-base ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                Monitor student performance across all assessments. Review exact scores, passing percentages, and inspect
-                questions where students made mistakes.
+                {filterTest !== "All"
+                  ? `Viewing student performance, scores, mistake breakdowns, and proctor recordings exclusively for "${filterTest}".`
+                  : "Monitor student performance across all assessments. Review exact scores, passing percentages, and inspect questions where students made mistakes."}
               </p>
             </div>
+
+            {/* Active Test Filter Banner */}
+            {filterTest !== "All" && (
+              <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-wrap items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-400 text-black flex items-center justify-center font-bold text-lg shadow-sm">
+                    <FiFilter className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-xs text-amber-400 font-semibold uppercase tracking-wider block">
+                      Specific Assessment Filter Active
+                    </span>
+                    <h3 className="text-base font-bold text-white">
+                      Showing records only for: <span className="text-amber-300 underline underline-offset-4">"{filterTest}"</span>
+                    </h3>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleClearTestFilter}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+                >
+                  <FiXCircle className="w-4 h-4 text-amber-400" />
+                  <span>Show All Tests Marks</span>
+                </button>
+              </div>
+            )}
 
             {/* Metrics Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -400,7 +505,7 @@ const EducatorMarks = () => {
                 <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search student wallet (0x...) or test..."
+                  placeholder="Search student wallet (0x...) or candidate..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`w-full pl-11 pr-4 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
@@ -415,7 +520,7 @@ const EducatorMarks = () => {
                 {/* Test filter */}
                 <select
                   value={filterTest}
-                  onChange={(e) => setFilterTest(e.target.value)}
+                  onChange={(e) => handleTestFilterChange(e.target.value)}
                   className={`px-4 py-2.5 rounded-xl text-xs font-semibold border focus:outline-none ${
                     isDarkMode ? "bg-gray-800 border-gray-700 text-white" : "bg-white border-gray-300 text-gray-900"
                   }`}
@@ -444,15 +549,19 @@ const EducatorMarks = () => {
                   ))}
                 </div>
 
-                {/* Educator Delete All Marks History button */}
-                {submissions.length > 0 && (
+                {/* Educator Delete History button */}
+                {filteredSubmissions.length > 0 && (
                   <button
-                    onClick={handleClearAllHistory}
+                    onClick={filterTest !== "All" ? handleClearFilteredTestHistory : handleClearAllHistory}
                     className="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-red-500/15 border border-red-500/40 text-red-400 hover:bg-red-500 hover:text-white transition-all flex items-center gap-1.5 ml-auto"
-                    title="Delete entire history of all students marks and video recordings"
+                    title={
+                      filterTest !== "All"
+                        ? `Delete all student marks & recordings for "${filterTest}"`
+                        : "Delete entire history of all students marks and video recordings"
+                    }
                   >
                     <FiTrash2 className="w-3.5 h-3.5" />
-                    <span>Clear All History</span>
+                    <span>{filterTest !== "All" ? `Clear "${filterTest}" History` : "Clear All History"}</span>
                   </button>
                 )}
               </div>
@@ -466,12 +575,26 @@ const EducatorMarks = () => {
             ) : filteredSubmissions.length === 0 ? (
               <div className="text-center py-20 rounded-3xl border border-gray-800 bg-gray-900/40">
                 <FiAward className="w-16 h-16 mx-auto text-gray-500 mb-3" />
-                <h3 className="text-xl font-bold mb-1">No Student Submissions Found</h3>
-                <p className="text-sm text-gray-400">
-                  {searchQuery || filterTest !== "All" || filterStatus !== "All"
+                <h3 className="text-xl font-bold mb-1">
+                  {filterTest !== "All"
+                    ? `No Student Submissions Yet for "${filterTest}"`
+                    : "No Student Submissions Found"}
+                </h3>
+                <p className="text-sm text-gray-400 max-w-md mx-auto mb-5">
+                  {filterTest !== "All"
+                    ? `No students have taken or submitted "${filterTest}" yet. Once students take this assessment, their test marks, mistake reviews, and webcam recordings will appear here.`
+                    : searchQuery || filterStatus !== "All"
                     ? "Try adjusting your search or filters."
                     : "When students take assessments, their marks and mistake breakdowns will appear here."}
                 </p>
+                {filterTest !== "All" && (
+                  <button
+                    onClick={handleClearTestFilter}
+                    className="px-5 py-2.5 rounded-xl font-bold text-xs bg-amber-400 text-black hover:bg-amber-300 transition-all shadow-md shadow-amber-400/20"
+                  >
+                    View All Assessments Marks
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
@@ -798,6 +921,29 @@ const EducatorMarks = () => {
                           </span>
                         </div>
 
+                        {/* Question Diagram / Image if present */}
+                        {item.question_image && (
+                          <div
+                            onClick={() =>
+                              setZoomImage({
+                                src: item.question_image,
+                                alt: `Question #${idx + 1} Diagram`
+                              })
+                            }
+                            className="group relative mb-3 rounded-xl overflow-hidden border border-amber-400/30 bg-black/50 p-2 flex flex-col items-center justify-center cursor-zoom-in hover:border-amber-400 transition-all"
+                            title="Click to zoom question diagram"
+                          >
+                            <img
+                              src={item.question_image}
+                              alt={`Question #${idx + 1} Diagram`}
+                              className="max-h-56 object-contain rounded-lg group-hover:scale-[1.02] transition-transform"
+                            />
+                            <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] text-amber-400 font-bold border border-amber-400/40 flex items-center gap-1 shadow-md opacity-90 group-hover:opacity-100">
+                              <FiZoomIn className="w-3 h-3" /> Click to Zoom
+                            </div>
+                          </div>
+                        )}
+
                         <h4 className="text-sm font-bold mb-3">{item.question}</h4>
 
                         {item.options && (
@@ -805,6 +951,7 @@ const EducatorMarks = () => {
                             {item.options.map((opt, optIdx) => {
                               const isStudentSelected = item.selected_option === optIdx;
                               const isCorrectOpt = item.correct_option === optIdx;
+                              const optImg = item.option_images && item.option_images[optIdx];
 
                               let optClass = "border-gray-800 text-gray-400";
                               if (isCorrectOpt) {
@@ -816,15 +963,37 @@ const EducatorMarks = () => {
                               return (
                                 <div
                                   key={optIdx}
-                                  className={`p-2.5 rounded-xl border flex items-center justify-between ${optClass}`}
+                                  className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${optClass}`}
                                 >
-                                  <span>
-                                    <strong>{optionLetters[optIdx]}:</strong> {opt}
-                                  </span>
-                                  {isCorrectOpt && <span className="text-emerald-400">✓ Correct Solution</span>}
-                                  {isStudentSelected && !isCorrectOpt && (
-                                    <span className="text-red-400">✗ Student's Answer</span>
+                                  <div className="flex items-center gap-2">
+                                    <span>
+                                      <strong>{optionLetters[optIdx]}:</strong> {opt}
+                                    </span>
+                                  </div>
+                                  {optImg && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setZoomImage({
+                                          src: optImg,
+                                          alt: `Option ${optionLetters[optIdx]} diagram`
+                                        });
+                                      }}
+                                      className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 max-h-16 flex items-center cursor-zoom-in hover:border-amber-400 transition-colors"
+                                      title="Click to zoom option diagram"
+                                    >
+                                      <img src={optImg} alt={`Option ${optionLetters[optIdx]}`} className="max-h-14 object-contain" />
+                                      <span className="text-[9px] text-amber-400 ml-1 font-bold flex items-center gap-0.5">
+                                        <FiZoomIn className="w-2.5 h-2.5" />
+                                      </span>
+                                    </div>
                                   )}
+                                  <div>
+                                    {isCorrectOpt && <span className="text-emerald-400">✓ Correct Solution</span>}
+                                    {isStudentSelected && !isCorrectOpt && (
+                                      <span className="text-red-400">✗ Student's Answer</span>
+                                    )}
+                                  </div>
                                 </div>
                               );
                             })}
@@ -858,6 +1027,14 @@ const EducatorMarks = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Image Zoom Modal */}
+      <ImageZoomModal
+        isOpen={Boolean(zoomImage)}
+        src={zoomImage?.src}
+        alt={zoomImage?.alt}
+        onClose={() => setZoomImage(null)}
+      />
     </div>
   );
 };

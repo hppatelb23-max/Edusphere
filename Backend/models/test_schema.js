@@ -3,15 +3,23 @@ const mongoose = require("mongoose");
 const QuestionSubSchema = new mongoose.Schema({
     question: {
         type: String,
-        required: true,
+        default: "",
+    },
+    question_image: {
+        type: String,
+        default: "",
     },
     options: [{
         type: String,
-        required: true,
+        default: "",
+    }],
+    option_images: [{
+        type: String,
+        default: "",
     }],
     correct_option: {
         type: Number,
-        required: true,
+        default: 0,
     },
     explanation: {
         type: String,
@@ -65,7 +73,9 @@ const SubmissionSubSchema = new mongoose.Schema({
     answers: [{
         question_id: String,
         question: String,
+        question_image: String,
         options: [String],
+        option_images: [String],
         selected_option: Number,
         correct_option: Number,
         is_correct: Boolean,

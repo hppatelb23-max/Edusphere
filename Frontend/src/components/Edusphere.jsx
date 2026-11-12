@@ -45,6 +45,16 @@ const Edusphere = () => {
   const navigate = useNavigate();
   const { disconnectWallet } = useWallet();
 
+  // Whenever user arrives on the starting home screen, automatically disconnect the wallet
+  useEffect(() => {
+    if (disconnectWallet) {
+      disconnectWallet({ silent: true });
+    }
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("walletConnected");
+    }
+  }, []);
+
   const handleStartLearning = (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (disconnectWallet) {

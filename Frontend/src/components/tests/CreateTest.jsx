@@ -16,13 +16,18 @@ import {
   FiCopy,
   FiDollarSign,
   FiBook,
-  FiGift
+  FiGift,
+  FiImage,
+  FiUpload,
+  FiX,
+  FiZoomIn
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
 import { useThemeStore } from "../../store/themeStore";
 import { useTheme } from "next-themes";
 import { createNewTest } from "../../utils/testsApi";
+import ImageZoomModal from "./ImageZoomModal";
 
 const CreateTest = () => {
   const navigate = useNavigate();
@@ -44,31 +49,36 @@ const CreateTest = () => {
   const [difficulty, setDifficulty] = useState("Intermediate");
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [passingScore, setPassingScore] = useState(60);
-  const [pickRandomCount, setPickRandomCount] = useState(5);
+  const [pickRandomCount, setPickRandomCount] = useState(2);
   const [authorName, setAuthorName] = useState("Educator");
   const [isPublishing, setIsPublishing] = useState(false);
+  const [zoomImage, setZoomImage] = useState(null); // { src, alt }
 
   // Question bank state (default with 2 initial question templates)
   const [questions, setQuestions] = useState([
     {
       question: "Which EVM opcode consumes the least gas for temporary computation variables?",
+      question_image: "",
       options: [
         "SSTORE (Storage Store)",
         "MLOAD (Memory Load)",
         "SLOAD (Storage Load)",
         "CREATE2 (Deterministic Deploy)"
       ],
+      option_images: ["", "", "", ""],
       correct_option: 1,
       explanation: "MLOAD interacts with temporary volatile memory which costs only 3 gas plus memory expansion, whereas SLOAD costs 100-2100 gas."
     },
     {
       question: "What is the primary role of a modifier in Solidity contracts?",
+      question_image: "",
       options: [
         "To compile contract bytecode into WebAssembly",
         "To change the behavior of functions declaratively, such as enforcing access control",
         "To store encrypted private keys inside the transaction log",
         "To execute off-chain Chainlink automation crons"
       ],
+      option_images: ["", "", "", ""],
       correct_option: 1,
       explanation: "Function modifiers are used to easily check conditions prior to executing the function code (such as onlyOwner)."
     }
@@ -97,17 +107,59 @@ const CreateTest = () => {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  // Helper: Compress uploaded images to crisp high-definition web size (~50-100KB)
+  // Prevents localStorage quota exceeded errors and network upload timeouts
+  const compressImageFile = (file, maxDimension = 1200, quality = 0.8) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type.startsWith("image/")) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL("image/jpeg", quality);
+          resolve(compressed);
+        };
+        img.onerror = () => resolve(e.target.result); // Fallback to raw if load fails
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Question manipulation
   const handleAddQuestion = () => {
     setQuestions((prev) => [
       ...prev,
       {
         question: "",
+        question_image: "",
         options: ["", "", "", ""],
+        option_images: ["", "", "", ""],
         correct_option: 0,
         explanation: ""
       }
     ]);
+    setPickRandomCount((prev) => prev + 1);
   };
 
   const handleRemoveQuestion = (qIndex) => {
@@ -115,13 +167,77 @@ const CreateTest = () => {
       toast.warn("A test question bank must have at least 1 question.");
       return;
     }
-    setQuestions((prev) => prev.filter((_, idx) => idx !== qIndex));
+    setQuestions((prev) => {
+      const updated = prev.filter((_, idx) => idx !== qIndex);
+      setPickRandomCount((p) => Math.min(p, updated.length));
+      return updated;
+    });
   };
 
   const handleQuestionTextChange = (qIndex, text) => {
     setQuestions((prev) => {
       const copy = [...prev];
       copy[qIndex] = { ...copy[qIndex], question: text };
+      return copy;
+    });
+  };
+
+  // Upload or set image diagram for question
+  const handleQuestionImageUpload = async (qIndex, file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file (PNG, JPG, WEBP, SVG).");
+      return;
+    }
+    const compressed = await compressImageFile(file, 1200, 0.82);
+    if (!compressed) {
+      toast.error("Failed to process image file.");
+      return;
+    }
+    setQuestions((prev) => {
+      const copy = [...prev];
+      copy[qIndex] = { ...copy[qIndex], question_image: compressed };
+      return copy;
+    });
+    toast.success("Question diagram/image uploaded & optimized!");
+  };
+
+  const handleRemoveQuestionImage = (qIndex) => {
+    setQuestions((prev) => {
+      const copy = [...prev];
+      copy[qIndex] = { ...copy[qIndex], question_image: "" };
+      return copy;
+    });
+  };
+
+  // Upload or set image for option
+  const handleOptionImageUpload = async (qIndex, optIndex, file) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a valid image file.");
+      return;
+    }
+    const compressed = await compressImageFile(file, 800, 0.8);
+    if (!compressed) {
+      toast.error("Failed to process option image.");
+      return;
+    }
+    setQuestions((prev) => {
+      const copy = [...prev];
+      const newImages = copy[qIndex].option_images ? [...copy[qIndex].option_images] : ["", "", "", ""];
+      newImages[optIndex] = compressed;
+      copy[qIndex] = { ...copy[qIndex], option_images: newImages };
+      return copy;
+    });
+    toast.success(`Option ${String.fromCharCode(65 + optIndex)} diagram uploaded!`);
+  };
+
+  const handleRemoveOptionImage = (qIndex, optIndex) => {
+    setQuestions((prev) => {
+      const copy = [...prev];
+      const newImages = copy[qIndex].option_images ? [...copy[qIndex].option_images] : ["", "", "", ""];
+      newImages[optIndex] = "";
+      copy[qIndex] = { ...copy[qIndex], option_images: newImages };
       return copy;
     });
   };
@@ -158,22 +274,26 @@ const CreateTest = () => {
       ...prev,
       {
         question: "What is an ERC-20 'allowance' mapping utilized for?",
+        question_image: "",
         options: [
           "Tracking how much ETH the contract can spend on gas fees",
           "Permitting a third-party spender to withdraw up to a specified token amount on behalf of an owner",
           "Encrypting the owner's seed phrase in contract memory",
           "Determining validator rewards in proof-of-stake consensus"
         ],
+        option_images: ["", "", "", ""],
         correct_option: 1,
         explanation: "The allowance(owner, spender) mechanism allows decentralized exchanges and contracts to transfer tokens on behalf of the user after approval."
       }
     ]);
+    setPickRandomCount((prev) => prev + 1);
     toast.success("Sample question added to bank!");
   };
 
   // Submit and Publish test
   const handlePublishTest = async (e) => {
     e.preventDefault();
+    if (isPublishing) return;
 
     if (!walletConnected || !walletAddress) {
       toast.error("Please connect your MetaMask educator wallet to publish a test.");
@@ -186,24 +306,54 @@ const CreateTest = () => {
       return;
     }
 
-    // Validate questions
+    // Validate that every question has at least question text OR diagram image
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.question.trim()) {
-        toast.error(`Question #${i + 1} is empty. Please enter question text.`);
+      const hasQText = q.question && q.question.trim();
+      const hasQImg = Boolean(q.question_image);
+      if (!hasQText && !hasQImg) {
+        toast.error(`Question #${i + 1} has neither text statement nor diagram image. Please upload a diagram or enter question text.`);
         return;
       }
-      for (let o = 0; o < q.options.length; o++) {
-        if (!q.options[o].trim()) {
-          toast.error(`Question #${i + 1}, Option ${String.fromCharCode(65 + o)} is empty.`);
-          return;
-        }
-      }
     }
+
+    // Package every question safely with fallbacks so no question or option is ever dropped
+    const processedQuestions = questions.map((q, qIdx) => {
+      const optionLetters = ["A", "B", "C", "D"];
+      const rawOptions = Array.isArray(q.options) && q.options.length >= 2 ? q.options : ["", "", "", ""];
+      
+      const optionsWithFallbacks = rawOptions.map((opt, oIdx) => {
+        const trimmed = (opt || "").trim();
+        if (trimmed) return trimmed;
+        if (q.option_images && q.option_images[oIdx]) {
+          return `Option ${optionLetters[oIdx] || oIdx + 1} (Diagram)`;
+        }
+        return `Option ${optionLetters[oIdx] || oIdx + 1}`;
+      });
+
+      // Ensure at least 4 options exist
+      while (optionsWithFallbacks.length < 4) {
+        optionsWithFallbacks.push(`Option ${optionLetters[optionsWithFallbacks.length] || optionsWithFallbacks.length + 1}`);
+      }
+
+      const qText = (q.question || "").trim();
+      const finalQuestionText = qText || (q.question_image ? `Question #${qIdx + 1} (Refer to diagram below)` : `Question #${qIdx + 1}`);
+
+      return {
+        ...q,
+        question: finalQuestionText,
+        question_image: q.question_image || "",
+        options: optionsWithFallbacks,
+        option_images: Array.isArray(q.option_images) ? q.option_images : ["", "", "", ""],
+        correct_option: typeof q.correct_option === "number" && q.correct_option >= 0 && q.correct_option < optionsWithFallbacks.length ? q.correct_option : 0,
+        explanation: (q.explanation || "").trim() || "See correct solution marked above."
+      };
+    });
 
     setIsPublishing(true);
 
     try {
+      const totalQs = processedQuestions.length;
       const testPayload = {
         title: title.trim(),
         description: description.trim(),
@@ -211,10 +361,10 @@ const CreateTest = () => {
         difficulty: difficulty,
         duration_minutes: Number(durationMinutes) || 15,
         passing_score: Number(passingScore) || 60,
-        pick_random_count: Math.min(Number(pickRandomCount) || questions.length, questions.length),
+        pick_random_count: Math.min(Math.max(Number(pickRandomCount) || totalQs, 1), totalQs),
         author_name: authorName.trim() || "Educator",
         author_wallet_id: walletAddress,
-        questions: questions
+        questions: processedQuestions
       };
 
       const res = await createNewTest(testPayload);
@@ -587,8 +737,8 @@ const CreateTest = () => {
                       : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
                   }`}
                 />
-                <span className="text-xs text-gray-400 mt-1 block">
-                  How many random MCQs to draw from this question bank for each student.
+                <span className="text-xs text-amber-400/90 mt-1 block font-medium">
+                  Currently set to deliver {Math.min(Number(pickRandomCount) || questions.length, questions.length)} of {questions.length} questions per student attempt.
                 </span>
               </div>
 
@@ -677,14 +827,75 @@ const CreateTest = () => {
                       )}
                     </div>
 
-                    {/* Question text */}
+                    {/* Question text & diagram */}
                     <div className="mb-6">
-                      <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-400">
-                        Question Statement *
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                          Question Statement & Diagram (Text & Image supported) *
+                        </label>
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/15 border border-amber-400/40 text-amber-400 hover:bg-amber-400 hover:text-black transition-all">
+                          <FiImage className="w-3.5 h-3.5" />
+                          <span>{q.question_image ? "Change Diagram/Image" : "+ Upload Diagram/Image"}</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              if (e.target.files && e.target.files[0]) {
+                                handleQuestionImageUpload(qIndex, e.target.files[0]);
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Diagram Image Preview if uploaded */}
+                      {q.question_image && (
+                        <div className="relative mb-3 rounded-2xl overflow-hidden border-2 border-amber-400/40 bg-black/40 p-2 flex flex-col items-center justify-center">
+                          <img
+                            src={q.question_image}
+                            alt={`Question #${qIndex + 1} Diagram`}
+                            onClick={() =>
+                              setZoomImage({
+                                src: q.question_image,
+                                alt: `Question #${qIndex + 1} Diagram`
+                              })
+                            }
+                            className="max-h-56 object-contain rounded-xl cursor-zoom-in hover:scale-[1.02] transition-transform"
+                            title="Click to zoom diagram"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setZoomImage({
+                                src: q.question_image,
+                                alt: `Question #${qIndex + 1} Diagram`
+                              })
+                            }
+                            className="mt-2 text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1 bg-black/60 px-2.5 py-1 rounded-full border border-amber-400/30"
+                          >
+                            <FiZoomIn className="w-3.5 h-3.5" /> Click to Zoom Diagram
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveQuestionImage(qIndex)}
+                            className="absolute top-3 right-3 bg-red-600/90 hover:bg-red-600 text-white p-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1 z-10"
+                            title="Remove this diagram image"
+                          >
+                            <FiX className="w-3.5 h-3.5" />
+                            <span>Remove</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Text writing space for question statement */}
                       <textarea
                         rows="2"
-                        placeholder="Type question text here..."
+                        placeholder={
+                          q.question_image
+                            ? "Type your question text referencing this diagram/image (e.g. 'Look at the diagram above and identify...')"
+                            : "Type question text or statement here..."
+                        }
                         value={q.question}
                         onChange={(e) => handleQuestionTextChange(qIndex, e.target.value)}
                         className={`w-full p-4 rounded-xl text-sm border focus:outline-none transition-all ${
@@ -692,59 +903,122 @@ const CreateTest = () => {
                             ? "bg-gray-900 border-gray-700 text-white focus:border-amber-400"
                             : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
                         }`}
-                        required
                       />
                     </div>
 
                     {/* 4 Options */}
                     <div className="mb-6">
-                      <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-400">
-                        Options & Select Correct Solution (Radio) *
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400">
+                          Options (Select Correct Solution radio) • Text & Image supported *
+                        </label>
+                        <span className="text-xs text-gray-400">
+                          Click letter [A, B, C, D] to mark correct solution
+                        </span>
+                      </div>
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {q.options.map((opt, optIdx) => {
                           const isCorrect = q.correct_option === optIdx;
+                          const optImg = q.option_images && q.option_images[optIdx];
 
                           return (
                             <div
                               key={optIdx}
-                              className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                              className={`p-3.5 rounded-2xl border flex flex-col gap-2 transition-all ${
                                 isCorrect
-                                  ? "bg-emerald-500/15 border-emerald-500 text-emerald-300"
+                                  ? "bg-emerald-500/15 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-500/10"
                                   : isDarkMode
                                   ? "bg-gray-900 border-gray-700 text-gray-200"
                                   : "bg-white border-gray-300 text-gray-800"
                               }`}
                             >
-                              {/* Option Letter button that sets as correct */}
-                              <button
-                                type="button"
-                                onClick={() => handleCorrectOptionChange(qIndex, optIdx)}
-                                title="Click to set as correct solution"
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 cursor-pointer transition-colors ${
-                                  isCorrect
-                                    ? "bg-emerald-500 text-black shadow-md"
-                                    : "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                                }`}
-                              >
-                                {optionLetters[optIdx]}
-                              </button>
+                              <div className="flex items-center gap-3">
+                                {/* Option Letter button that sets as correct */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleCorrectOptionChange(qIndex, optIdx)}
+                                  title="Click to set as correct solution"
+                                  className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 cursor-pointer transition-colors ${
+                                    isCorrect
+                                      ? "bg-emerald-500 text-black shadow-md"
+                                      : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+                                  }`}
+                                >
+                                  {optionLetters[optIdx]}
+                                </button>
 
-                              <input
-                                type="text"
-                                placeholder={`Option ${optionLetters[optIdx]} text...`}
-                                value={opt}
-                                onChange={(e) => handleOptionChange(qIndex, optIdx, e.target.value)}
-                                className={`flex-1 bg-transparent border-none focus:outline-none text-sm ${
-                                  isCorrect ? "font-semibold" : ""
-                                }`}
-                                required
-                              />
+                                <input
+                                  type="text"
+                                  placeholder={`Option ${optionLetters[optIdx]} text or caption...`}
+                                  value={opt}
+                                  onChange={(e) => handleOptionChange(qIndex, optIdx, e.target.value)}
+                                  className={`flex-1 bg-transparent border-none focus:outline-none text-sm ${
+                                    isCorrect ? "font-semibold" : ""
+                                  }`}
+                                />
 
-                              {isCorrect && (
-                                <span className="text-xs font-bold text-emerald-400 shrink-0">
-                                  ✓ Solution
-                                </span>
+                                {/* Option image upload button */}
+                                <label
+                                  className={`cursor-pointer p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-all shrink-0 ${
+                                    optImg
+                                      ? "bg-purple-500/20 border-purple-400/40 text-purple-300"
+                                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                                  }`}
+                                  title={`Upload image for Option ${optionLetters[optIdx]}`}
+                                >
+                                  <FiImage className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] hidden sm:inline">{optImg ? "Change" : "+ Image"}</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      if (e.target.files && e.target.files[0]) {
+                                        handleOptionImageUpload(qIndex, optIdx, e.target.files[0]);
+                                      }
+                                    }}
+                                  />
+                                </label>
+
+                                {isCorrect && (
+                                  <span className="text-xs font-bold text-emerald-400 shrink-0">
+                                    ✓ Solution
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* If Option has an image, render preview */}
+                              {optImg && (
+                                <div className="relative mt-1 rounded-xl overflow-hidden border border-purple-500/30 bg-black/40 p-1 flex items-center justify-between">
+                                  <div
+                                    onClick={() =>
+                                      setZoomImage({
+                                        src: optImg,
+                                        alt: `Option ${optionLetters[optIdx]} image`
+                                      })
+                                    }
+                                    className="flex items-center gap-2 cursor-zoom-in group"
+                                    title="Click to zoom option diagram"
+                                  >
+                                    <img
+                                      src={optImg}
+                                      alt={`Option ${optionLetters[optIdx]} image`}
+                                      className="max-h-24 max-w-[80%] object-contain rounded-lg group-hover:scale-105 transition-transform"
+                                    />
+                                    <span className="text-[10px] text-purple-400 font-bold flex items-center gap-1 group-hover:underline">
+                                      <FiZoomIn className="w-3 h-3" /> Zoom
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOptionImage(qIndex, optIdx)}
+                                    className="bg-red-500/20 hover:bg-red-500 text-red-400 hover:text-white p-1 rounded-md text-xs font-bold mr-1 shrink-0"
+                                    title="Remove this option image"
+                                  >
+                                    <FiX className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               )}
                             </div>
                           );
@@ -819,6 +1093,14 @@ const CreateTest = () => {
         </>
         )}
       </div>
+
+      {/* Interactive Image Zoom Modal */}
+      <ImageZoomModal
+        isOpen={Boolean(zoomImage)}
+        src={zoomImage?.src}
+        alt={zoomImage?.alt}
+        onClose={() => setZoomImage(null)}
+      />
     </div>
   );
 };

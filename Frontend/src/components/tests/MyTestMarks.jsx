@@ -14,7 +14,8 @@ import {
   FiBook,
   FiDollarSign,
   FiGift,
-  FiPlus
+  FiPlus,
+  FiZoomIn
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
@@ -22,6 +23,7 @@ import { useThemeStore } from "../../store/themeStore";
 import { useTheme } from "next-themes";
 import { fetchMySubmissions } from "../../utils/testsApi";
 import { getStoredTests, dummySampleTests } from "../../utils/dummyTests";
+import ImageZoomModal from "./ImageZoomModal";
 
 const MyTestMarks = () => {
   const [submissions, setSubmissions] = useState([]);
@@ -29,6 +31,7 @@ const MyTestMarks = () => {
   const [expandedId, setExpandedId] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mistakeFilter, setMistakeFilter] = useState({}); // { [id]: 'all'|'wrong'|'correct' }
+  const [zoomImage, setZoomImage] = useState(null); // { src, alt }
 
   // Fallback resolver so student can ALWAYS review questions & mistake breakdowns
   const getReviewList = (sub) => {
@@ -667,6 +670,28 @@ const MyTestMarks = () => {
                                       </div>
                                     )}
 
+                                    {/* Question Diagram / Image if present */}
+                                    {item.question_image && (
+                                      <div
+                                        onClick={() =>
+                                          setZoomImage({
+                                            src: item.question_image,
+                                            alt: `Question #${qIdx + 1} Diagram`
+                                          })
+                                        }
+                                        className="group relative mb-4 rounded-xl overflow-hidden border border-amber-400/30 bg-black/50 p-2 flex flex-col items-center justify-center cursor-zoom-in hover:border-amber-400 transition-all"
+                                      >
+                                        <img
+                                          src={item.question_image}
+                                          alt={`Question #${qIdx + 1} Diagram`}
+                                          className="max-h-60 object-contain rounded-lg"
+                                        />
+                                        <span className="text-xs text-amber-300 font-bold mt-1.5 flex items-center gap-1">
+                                          <FiZoomIn className="w-3.5 h-3.5" /> Click diagram to zoom in
+                                        </span>
+                                      </div>
+                                    )}
+
                                     <p className="font-bold text-base mb-4 leading-snug">
                                       {item.question}
                                     </p>
@@ -677,6 +702,7 @@ const MyTestMarks = () => {
                                         item.options.map((opt, oIdx) => {
                                           const isYours = item.selected_option === oIdx;
                                           const isCorrectOpt = item.correct_option === oIdx;
+                                          const optImg = item.option_images && item.option_images[oIdx];
 
                                           let cls = isDarkMode
                                             ? "border-gray-700 bg-gray-900/40"
@@ -696,9 +722,9 @@ const MyTestMarks = () => {
                                           return (
                                             <div
                                               key={oIdx}
-                                              className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${cls}`}
+                                              className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${cls}`}
                                             >
-                                              <div className="flex items-center gap-3">
+                                              <div className="flex items-center gap-3 flex-1">
                                                 <span
                                                   className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold shrink-0 ${badge}`}
                                                 >
@@ -706,7 +732,25 @@ const MyTestMarks = () => {
                                                 </span>
                                                 <span className="text-sm">{opt}</span>
                                               </div>
-                                              <span className="text-xs font-bold">
+                                              {optImg && (
+                                                <div
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setZoomImage({
+                                                      src: optImg,
+                                                      alt: `Option ${optLetters[oIdx]} diagram`
+                                                    });
+                                                  }}
+                                                  className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 flex flex-col items-center shrink-0 cursor-zoom-in hover:border-amber-400"
+                                                  title="Click to zoom option diagram"
+                                                >
+                                                  <img src={optImg} alt={`Option ${optLetters[oIdx]}`} className="max-h-16 object-contain" />
+                                                  <span className="text-[9px] text-amber-400 mt-0.5 font-bold flex items-center gap-0.5">
+                                                    <FiZoomIn className="w-2.5 h-2.5" /> Zoom
+                                                  </span>
+                                                </div>
+                                              )}
+                                              <span className="text-xs font-bold shrink-0">
                                                 {isCorrectOpt && (
                                                   <span className="text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
                                                     ✓ Correct Solution
@@ -760,6 +804,14 @@ const MyTestMarks = () => {
           </div>
         )}
       </div>
+
+      {/* Image Zoom Modal */}
+      <ImageZoomModal
+        isOpen={Boolean(zoomImage)}
+        src={zoomImage?.src}
+        alt={zoomImage?.alt}
+        onClose={() => setZoomImage(null)}
+      />
     </div>
   );
 };

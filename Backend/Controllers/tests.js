@@ -331,11 +331,13 @@ async function GetTestById(req, res) {
             const shuffledQuestions = shuffleArray(testObj.questions);
             const selectedQuestions = shuffledQuestions.slice(0, count);
 
-            // Hide correct_option and explanation for active test delivery
+            // Hide correct_option and explanation for active test delivery, but KEEP images!
             const sanitizedQuestions = selectedQuestions.map((q) => ({
                 _id: q._id,
                 question: q.question,
-                options: q.options
+                question_image: q.question_image || "",
+                options: q.options,
+                option_images: q.option_images || []
             }));
 
             testObj.questions = sanitizedQuestions;
@@ -375,11 +377,14 @@ async function CreateTest(req, res) {
             return res.status(400).json({ error: "Please add at least one question to the test question bank." });
         }
 
-        // Validate each question format
+        // Validate each question format (support text, diagram/image, or both!)
         for (let i = 0; i < questions.length; i++) {
             const q = questions[i];
-            if (!q.question || !Array.isArray(q.options) || q.options.length < 2) {
-                return res.status(400).json({ error: `Question ${i + 1} must have question text and at least 2 options.` });
+            if ((!q.question || !q.question.trim()) && !q.question_image) {
+                return res.status(400).json({ error: `Question ${i + 1} must have either question statement text or a diagram/image.` });
+            }
+            if (!Array.isArray(q.options) || q.options.length < 2) {
+                return res.status(400).json({ error: `Question ${i + 1} must have at least 2 options.` });
             }
             if (q.correct_option === undefined || q.correct_option < 0 || q.correct_option >= q.options.length) {
                 return res.status(400).json({ error: `Question ${i + 1} has an invalid correct option index.` });
@@ -443,7 +448,9 @@ async function SubmitTest(req, res) {
                 detailedReview.push({
                     question_id: originalQ._id,
                     question: originalQ.question,
+                    question_image: originalQ.question_image || "",
                     options: originalQ.options,
+                    option_images: originalQ.option_images || [],
                     selected_option: ans.selected_option,
                     correct_option: originalQ.correct_option,
                     is_correct: isCorrect,
@@ -556,20 +563,30 @@ async function GetEducatorSubmissions(req, res) {
 
 async function GetMySubmissions(req, res) {
     try {
-        const { student_wallet } = req.query;
-        if (!student_wallet) {
-            return res.status(400).json({ error: "student_wallet query parameter is required." });
+        const { student_wallet, student_name } = req.query;
+        let query = {};
+        if (student_wallet && student_name) {
+            query = {
+                $or: [
+                    { "submissions.student_wallet_id": { $regex: new RegExp(`^${student_wallet}$`, "i") } },
+                    { "submissions.student_name": { $regex: new RegExp(`^${student_name}$`, "i") } }
+                ]
+            };
+        } else if (student_wallet) {
+            query = { "submissions.student_wallet_id": { $regex: new RegExp(`^${student_wallet}$`, "i") } };
+        } else if (student_name) {
+            query = { "submissions.student_name": { $regex: new RegExp(`^${student_name}$`, "i") } };
         }
 
-        const tests = await Tests.find({
-            "submissions.student_wallet_id": { $regex: new RegExp(`^${student_wallet}$`, "i") }
-        }).select("title author_name passing_score submissions");
+        const tests = await Tests.find(query).select("title author_name passing_score submissions");
 
         const mySubmissions = [];
         tests.forEach(t => {
             if (Array.isArray(t.submissions)) {
                 t.submissions.forEach(sub => {
-                    if (sub.student_wallet_id && sub.student_wallet_id.toLowerCase() === student_wallet.toLowerCase()) {
+                    const matchWallet = student_wallet && sub.student_wallet_id && sub.student_wallet_id.toLowerCase() === student_wallet.toLowerCase();
+                    const matchName = student_name && sub.student_name && sub.student_name.toLowerCase() === student_name.toLowerCase();
+                    if (matchWallet || matchName || (!student_wallet && !student_name)) {
                         mySubmissions.push({
                             submission_id: sub._id,
                             test_id: t._id,
@@ -606,9 +623,16 @@ async function GetMySubmissions(req, res) {
 async function DeleteTest(req, res) {
     try {
         const { id } = req.params;
-        const test = await Tests.findById(id);
-        if (!test) return res.status(404).json({ error: "Test not found." });
-        await Tests.findByIdAndDelete(id);
+        const mongoose = require("mongoose");
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            await Tests.findByIdAndDelete(id);
+        } else {
+            try {
+                await Tests.deleteOne({ $or: [{ _id: id }, { title: id }] });
+            } catch (innerErr) {
+                console.warn("DeleteTest custom ID fallback notice:", innerErr.message);
+            }
+        }
         return res.status(200).json({ message: "Test deleted successfully." });
     } catch (err) {
         return res.status(500).json({ error: "Error deleting test: " + err.message });

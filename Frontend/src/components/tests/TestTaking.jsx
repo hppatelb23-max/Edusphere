@@ -22,13 +22,16 @@ import {
   FiSun,
   FiX,
   FiSmartphone,
-  FiPlay
+  FiPlay,
+  FiMaximize2,
+  FiZoomIn
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
 import { useThemeStore } from "../../store/themeStore";
 import { fetchTestById, submitTestAnswers } from "../../utils/testsApi";
 import { saveProctorRecording } from "../../utils/proctorRecordingDB";
+import ImageZoomModal from "./ImageZoomModal";
 
 const TestTaking = () => {
   const { id } = useParams();
@@ -54,6 +57,7 @@ const TestTaking = () => {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [showCheatingWarning, setShowCheatingWarning] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [zoomImage, setZoomImage] = useState(null); // { src, alt } for zoom modal
 
   // ── Camera Proctoring State ──────────────────────────────────────
   const [cameraPermission, setCameraPermission] = useState("idle"); // 'idle'|'requesting'|'granted'|'denied'
@@ -1015,15 +1019,40 @@ const TestTaking = () => {
                   </button>
                 </div>
 
+                {/* Question Diagram / Image if uploaded by educator */}
+                {currentQ.question_image && (
+                  <div
+                    onClick={() =>
+                      setZoomImage({
+                        src: currentQ.question_image,
+                        alt: `Question #${currentIndex + 1} Diagram`
+                      })
+                    }
+                    className="group relative mb-6 rounded-2xl overflow-hidden border-2 border-amber-400/40 bg-black/60 p-3 flex flex-col items-center justify-center shadow-xl cursor-zoom-in hover:border-amber-400 transition-all"
+                  >
+                    <img
+                      src={currentQ.question_image}
+                      alt={`Question #${currentIndex + 1} Diagram`}
+                      className="max-h-96 w-auto object-contain rounded-xl transition-transform duration-200 group-hover:scale-[1.01]"
+                    />
+                    <div className="mt-2.5 flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-400/30 text-xs font-bold group-hover:bg-amber-400 group-hover:text-black transition-colors">
+                      <FiZoomIn className="w-3.5 h-3.5" />
+                      <span>Click diagram to zoom in & view fullscreen</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Question Statement */}
-                <div
-                  className={`p-6 rounded-2xl border mb-6 text-lg sm:text-xl font-bold leading-relaxed ${isDarkMode
-                      ? "bg-black/40 border-gray-800 text-white"
-                      : "bg-amber-50/60 border-amber-200 text-gray-900"
-                    }`}
-                >
-                  {currentQ.question}
-                </div>
+                {currentQ.question && (
+                  <div
+                    className={`p-6 rounded-2xl border mb-6 text-lg sm:text-xl font-bold leading-relaxed ${isDarkMode
+                        ? "bg-black/40 border-gray-800 text-white"
+                        : "bg-amber-50/60 border-amber-200 text-gray-900"
+                      }`}
+                  >
+                    {currentQ.question}
+                  </div>
+                )}
 
                 {/* Options List */}
                 <div className="space-y-3 mb-8">
@@ -1031,29 +1060,59 @@ const TestTaking = () => {
                     currentQ.options.map((option, optIdx) => {
                       const isSelected = currentSelectedOption === optIdx;
                       const optionLetters = ["A", "B", "C", "D"];
+                      const optImg = currentQ.option_images && currentQ.option_images[optIdx];
 
                       return (
                         <div
                           key={optIdx}
                           onClick={() => handleOptionSelect(optIdx)}
-                          className={`p-4 sm:p-5 rounded-2xl border flex items-center gap-4 cursor-pointer transition-all ${isSelected
+                          className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer transition-all ${isSelected
                               ? "bg-amber-500/20 border-amber-400 text-amber-300 shadow-lg shadow-amber-400/15 scale-[1.01]"
                               : isDarkMode
                                 ? "bg-gray-800/40 border-gray-800 hover:border-gray-700 hover:bg-gray-800/80 text-gray-300"
                                 : "bg-white border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 text-gray-800"
                             }`}
                         >
-                          <div
-                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 transition-colors ${isSelected
-                                ? "bg-amber-400 text-black shadow-md shadow-amber-400/20"
-                                : isDarkMode
-                                  ? "bg-gray-800 text-gray-400 border border-gray-700"
-                                  : "bg-gray-100 text-gray-600 border border-gray-200"
-                              }`}
-                          >
-                            {optionLetters[optIdx] || optIdx + 1}
+                          <div className="flex items-center gap-4 flex-1">
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm shrink-0 transition-colors ${isSelected
+                                  ? "bg-amber-400 text-black shadow-md shadow-amber-400/20"
+                                  : isDarkMode
+                                    ? "bg-gray-800 text-gray-400 border border-gray-700"
+                                    : "bg-gray-100 text-gray-600 border border-gray-200"
+                                }`}
+                            >
+                              {optionLetters[optIdx] || optIdx + 1}
+                            </div>
+                            {option && (
+                              <span className="text-base sm:text-lg font-medium flex-1">{option}</span>
+                            )}
                           </div>
-                          <span className="text-base sm:text-lg font-medium flex-1">{option}</span>
+
+                          {/* Option Diagram Image if uploaded by educator */}
+                          {optImg && (
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setZoomImage({
+                                  src: optImg,
+                                  alt: `Option ${optionLetters[optIdx]} Diagram`
+                                });
+                              }}
+                              className="group/opt relative rounded-xl overflow-hidden border border-gray-700/80 bg-black/50 p-1.5 flex flex-col items-center justify-center shrink-0 cursor-zoom-in hover:border-amber-400 transition-all"
+                              title="Click to view and zoom option diagram"
+                            >
+                              <img
+                                src={optImg}
+                                alt={`Option ${optionLetters[optIdx]} diagram`}
+                                className="max-h-24 sm:max-h-28 object-contain rounded-lg"
+                              />
+                              <span className="text-[10px] text-amber-300 font-bold mt-1 flex items-center gap-1 group-hover/opt:text-amber-400">
+                                <FiZoomIn className="w-3 h-3" /> Click to zoom
+                              </span>
+                            </div>
+                          )}
+
                           {isSelected && (
                             <FiCheckCircle className="w-5 h-5 text-amber-400 shrink-0" />
                           )}
@@ -1323,6 +1382,28 @@ const TestTaking = () => {
                           </span>
                         </div>
 
+                        {/* Question Diagram / Image if present */}
+                        {item.question_image && (
+                          <div
+                            onClick={() =>
+                              setZoomImage({
+                                src: item.question_image,
+                                alt: `Question #${idx + 1} Diagram`
+                              })
+                            }
+                            className="group relative mb-4 rounded-xl overflow-hidden border border-amber-400/30 bg-black/50 p-2 flex flex-col items-center justify-center cursor-zoom-in hover:border-amber-400 transition-all"
+                          >
+                            <img
+                              src={item.question_image}
+                              alt={`Question #${idx + 1} Diagram`}
+                              className="max-h-80 object-contain rounded-lg"
+                            />
+                            <span className="text-xs text-amber-300 font-bold mt-1.5 flex items-center gap-1">
+                              <FiZoomIn className="w-3.5 h-3.5" /> Click diagram to zoom in
+                            </span>
+                          </div>
+                        )}
+
                         {/* Question text */}
                         <h4 className="text-base font-bold mb-4">{item.question}</h4>
 
@@ -1332,6 +1413,7 @@ const TestTaking = () => {
                             item.options.map((opt, optIdx) => {
                               const isStudentSelected = item.selected_option === optIdx;
                               const isCorrectOpt = item.correct_option === optIdx;
+                              const optImg = item.option_images && item.option_images[optIdx];
 
                               let optBorder = isDarkMode ? "border-gray-800 bg-gray-900/40" : "border-gray-200 bg-white";
                               let badgeColor = "bg-gray-800 text-gray-400";
@@ -1347,9 +1429,9 @@ const TestTaking = () => {
                               return (
                                 <div
                                   key={optIdx}
-                                  className={`p-3 rounded-xl border text-sm flex items-center justify-between gap-3 ${optBorder}`}
+                                  className={`p-3 rounded-xl border text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${optBorder}`}
                                 >
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-3 flex-1">
                                     <span
                                       className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold ${badgeColor}`}
                                     >
@@ -1357,7 +1439,25 @@ const TestTaking = () => {
                                     </span>
                                     <span>{opt}</span>
                                   </div>
-                                  <div className="text-xs font-semibold">
+                                  {optImg && (
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setZoomImage({
+                                          src: optImg,
+                                          alt: `Option ${optionLetters[optIdx]} diagram`
+                                        });
+                                      }}
+                                      className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 flex flex-col items-center shrink-0 cursor-zoom-in hover:border-amber-400"
+                                      title="Click to zoom option diagram"
+                                    >
+                                      <img src={optImg} alt={`Option ${optionLetters[optIdx]}`} className="max-h-16 object-contain" />
+                                      <span className="text-[9px] text-amber-400 mt-0.5 font-bold flex items-center gap-0.5">
+                                        <FiZoomIn className="w-2.5 h-2.5" /> Zoom
+                                      </span>
+                                    </div>
+                                  )}
+                                  <div className="text-xs font-semibold shrink-0">
                                     {isCorrectOpt && <span className="text-emerald-400">✓ Correct Solution</span>}
                                     {isStudentSelected && !isCorrectOpt && (
                                       <span className="text-red-400">✗ Your Answer</span>
@@ -1518,6 +1618,14 @@ const TestTaking = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ── Image Fullscreen & Zoom Lightbox Modal ── */}
+      <ImageZoomModal
+        isOpen={Boolean(zoomImage)}
+        src={zoomImage?.src}
+        alt={zoomImage?.alt || "Assessment Diagram"}
+        onClose={() => setZoomImage(null)}
+      />
     </div>
   );
 };

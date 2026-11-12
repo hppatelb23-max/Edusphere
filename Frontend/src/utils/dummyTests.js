@@ -360,15 +360,66 @@ export const dummySampleTests = [
 ];
 
 const LOCAL_STORAGE_KEY = "edusphere_custom_tests_v1";
+const DELETED_TESTS_KEY = "edusphere_deleted_test_ids_v1";
+
+export const getDeletedTestIds = () => {
+  try {
+    const raw = localStorage.getItem(DELETED_TESTS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch (e) {
+    return new Set();
+  }
+};
+
+export const markTestAsDeleted = (testId) => {
+  try {
+    const raw = localStorage.getItem(DELETED_TESTS_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    if (!list.includes(String(testId))) {
+      list.push(String(testId));
+      localStorage.setItem(DELETED_TESTS_KEY, JSON.stringify(list));
+    }
+    // Also remove from custom tests
+    const customRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (customRaw) {
+      const custom = JSON.parse(customRaw);
+      const filtered = custom.filter(t => String(t._id) !== String(testId));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(filtered));
+    }
+  } catch (e) {
+    console.error("Error marking test as deleted:", e);
+  }
+};
 
 export const getStoredTests = () => {
   try {
+    const deletedIds = getDeletedTestIds();
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
     const custom = raw ? JSON.parse(raw) : [];
-    // Combine custom tests with sample tests (custom tests first)
-    const customIds = new Set(custom.map(t => t._id));
-    const combined = [...custom, ...dummySampleTests.filter(t => !customIds.has(t._id))];
-    return combined;
+
+    // Deduplicate custom tests by normalized title (latest copy wins)
+    const seenTitles = new Set();
+    const uniqueCustom = [];
+    for (const t of custom) {
+      const normTitle = (t.title || "").trim().toLowerCase();
+      if (normTitle && !seenTitles.has(normTitle)) {
+        seenTitles.add(normTitle);
+        uniqueCustom.push(t);
+      } else if (!normTitle) {
+        uniqueCustom.push(t);
+      }
+    }
+
+    // Combine custom tests with sample tests (custom tests take priority)
+    const customIds = new Set(uniqueCustom.map(t => String(t._id)));
+    const sampleTests = dummySampleTests.filter(t => 
+      !customIds.has(String(t._id)) && 
+      !seenTitles.has((t.title || "").trim().toLowerCase())
+    );
+
+    const combined = [...uniqueCustom, ...sampleTests];
+    // Exclude any tests marked as deleted by educator
+    return combined.filter(t => !deletedIds.has(String(t._id)) && !deletedIds.has(t._id));
   } catch (err) {
     console.warn("Error reading local tests:", err);
     return dummySampleTests;
@@ -382,11 +433,33 @@ export const saveCustomTest = (newTest) => {
     const testToSave = {
       ...newTest,
       _id: newTest._id || `test_custom_${Date.now()}`,
-      created_at: new Date().toISOString(),
-      attempts_count: 0
+      created_at: newTest.created_at || new Date().toISOString(),
+      attempts_count: newTest.attempts_count || 0
     };
-    custom.unshift(testToSave);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(custom));
+
+    const newNormTitle = (testToSave.title || "").trim().toLowerCase();
+
+    // Deduplicate: replace any existing entry with same _id OR same title
+    const deduped = custom.filter(t => {
+      const sameId = String(t._id) === String(testToSave._id);
+      const sameTitle = newNormTitle && (t.title || "").trim().toLowerCase() === newNormTitle;
+      return !sameId && !sameTitle;
+    });
+
+    deduped.unshift(testToSave);
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped));
+    } catch (quotaErr) {
+      console.warn("Storage quota limit reached, keeping newest tests to fit:", quotaErr.message);
+      // Keep newest 5 custom tests to free storage quota
+      const trimmed = deduped.slice(0, 5);
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(trimmed));
+      } catch (innerErr) {
+        // If still tight, keep newest 2
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(deduped.slice(0, 2)));
+      }
+    }
     return testToSave;
   } catch (err) {
     console.error("Error saving custom test:", err);
@@ -426,7 +499,9 @@ export const gradeTestSubmissionLocally = (test, answers, studentWallet) => {
       detailedReview.push({
         question_id: originalQ._id || originalQ.question,
         question: originalQ.question,
+        question_image: originalQ.question_image || "",
         options: originalQ.options,
+        option_images: originalQ.option_images || [],
         selected_option: ans.selected_option,
         correct_option: originalQ.correct_option,
         is_correct: isCorrect,

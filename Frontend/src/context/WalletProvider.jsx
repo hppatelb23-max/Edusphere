@@ -125,13 +125,12 @@ export const WalletProvider = ({ children }) => {
     return null;
   };
 
-  // Connect wallet function triggered across app
+  // Connect wallet function triggered across app: opens the centered medium-sized box in the middle
   const connectWallet = (navigatetosignup) => {
     const callback = typeof navigatetosignup === "function" ? navigatetosignup : null;
     setPendingCallback(() => callback);
     setConnectError("");
     setShowMetaMaskModal(true);
-    executeConnectMetaMask(callback);
   };
 
   // Detect account changes only for already connected sessions
@@ -160,7 +159,7 @@ export const WalletProvider = ({ children }) => {
   }, []);
 
   // Disconnect wallet function
-  const disconnectWallet = () => {
+  const disconnectWallet = (options = {}) => {
     setWalletAddress(null);
     setWalletConnected(false);
     if (typeof window !== "undefined") {
@@ -171,7 +170,9 @@ export const WalletProvider = ({ children }) => {
     deleteCookie("user");
     localStorage.removeItem("admin");
     localStorage.removeItem("user");
-    toast.info("Wallet disconnected");
+    if (!options?.silent) {
+      toast.info("Wallet disconnected");
+    }
   };
 
   return (

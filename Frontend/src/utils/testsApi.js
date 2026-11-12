@@ -8,28 +8,39 @@ import {
   getRandomQuestionsForTest,
   gradeTestSubmissionLocally,
   getStoredSubmissions,
-  saveSubmissionLocally
+  saveSubmissionLocally,
+  getDeletedTestIds,
+  markTestAsDeleted
 } from "./dummyTests";
 
 export const fetchAllTests = async () => {
+  const deletedIds = getDeletedTestIds();
   try {
-    const res = await axios.get(`${API_BASE_URL}/tests`, { timeout: 4000 });
+    const res = await axios.get(`${API_BASE_URL}/tests`, { timeout: 10000 });
     if (res.data?.tests && Array.isArray(res.data.tests) && res.data.tests.length > 0) {
-      // Merge backend tests with any locally created custom tests
+      const backendTests = res.data.tests;
+      const backendIds = new Set(backendTests.map(t => String(t._id)));
+      const backendTitles = new Set(backendTests.map(t => (t.title || "").trim().toLowerCase()));
+
       const local = getStoredTests();
-      const backendIds = new Set(res.data.tests.map(t => t._id));
-      const combined = [...res.data.tests, ...local.filter(t => !backendIds.has(t._id))];
-      return combined;
+      // Only keep local tests that do NOT already exist on backend by ID or Title
+      const uniqueLocal = local.filter(t => 
+        !backendIds.has(String(t._id)) && 
+        !backendTitles.has((t.title || "").trim().toLowerCase())
+      );
+
+      const combined = [...backendTests, ...uniqueLocal];
+      return combined.filter(t => !deletedIds.has(String(t._id)) && !deletedIds.has(t._id));
     }
   } catch (err) {
     console.warn("Backend /tests not reachable, using offline question banks:", err.message);
   }
-  return getStoredTests();
+  return getStoredTests().filter(t => !deletedIds.has(String(t._id)) && !deletedIds.has(t._id));
 };
 
 export const fetchTestById = async (id, randomize = false) => {
   try {
-    const res = await axios.get(`${API_BASE_URL}/tests/${id}?randomize=${randomize}`, { timeout: 4000 });
+    const res = await axios.get(`${API_BASE_URL}/tests/${id}?randomize=${randomize}`, { timeout: 10000 });
     if (res.data?.test) {
       return res.data.test;
     }
@@ -55,10 +66,10 @@ export const createNewTest = async (testData) => {
   try {
     const res = await axios.post(`${API_BASE_URL}/tests/create`, testData, {
       headers: { "Content-Type": "application/json" },
-      timeout: 5000
+      timeout: 30000  // 30s — base64 image payloads can be large
     });
     if (res.status === 201 && res.data?.test) {
-      // Also cache in local storage
+      // Backend succeeded: save ONLY the single authoritative backend test to local cache
       saveCustomTest(res.data.test);
       return { success: true, test: res.data.test, message: res.data.message };
     }
@@ -66,7 +77,7 @@ export const createNewTest = async (testData) => {
     console.warn("Backend create test failed or offline, saving to local storage:", err.message);
   }
 
-  // Graceful local fallback
+  // Offline fallback only: save locally if backend is unreachable
   const saved = saveCustomTest(testData);
   return {
     success: true,
@@ -121,23 +132,60 @@ export const submitTestAnswers = async (submissionData) => {
   return { success: false, error: "Unable to find test to evaluate answers." };
 };
 
-export const fetchMySubmissions = async (studentWallet) => {
-  if (!studentWallet) return [];
+export const fetchMySubmissions = async (studentWallet, studentName) => {
+  const currentName =
+    studentName ||
+    localStorage.getItem("username") ||
+    localStorage.getItem("studentName") ||
+    localStorage.getItem("name") ||
+    "";
+
+  let backendSubmissions = [];
   try {
-    const res = await axios.get(
-      `${API_BASE_URL}/tests/submissions/my?student_wallet=${studentWallet}`,
-      { timeout: 4000 }
-    );
+    const params = new URLSearchParams();
+    if (studentWallet) params.append("student_wallet", studentWallet);
+    if (currentName) params.append("student_name", currentName);
+    const queryStr = params.toString() ? `?${params.toString()}` : "";
+    const res = await axios.get(`${API_BASE_URL}/tests/submissions/my${queryStr}`, { timeout: 4000 });
     if (res.data?.submissions && Array.isArray(res.data.submissions)) {
-      return res.data.submissions;
+      backendSubmissions = res.data.submissions;
     }
   } catch (err) {
-    console.warn("Backend /submissions/my not reachable, using local filter:", err.message);
+    console.warn("Backend /submissions/my not reachable, using local storage:", err.message);
   }
-  // Local fallback: filter stored submissions by wallet address
-  return getStoredSubmissions().filter(
-    (s) => s.student_wallet_id && s.student_wallet_id.toLowerCase() === studentWallet.toLowerCase()
-  );
+
+  // Get local stored submissions on this browser
+  const local = getStoredSubmissions();
+
+  // Combine backend + local submissions, deduplicating by ID
+  const combined = [...backendSubmissions];
+  const seenIds = new Set(backendSubmissions.map((s) => String(s.submission_id || s._id)));
+
+  local.forEach((s) => {
+    const sId = String(s.submission_id || s._id);
+    if (seenIds.has(sId)) return;
+
+    let isMatch = true;
+    if (studentWallet) {
+      const matchWallet =
+        s.student_wallet_id && s.student_wallet_id.toLowerCase() === studentWallet.toLowerCase();
+      const matchGuest = s.student_wallet_id === "guest_student";
+      const matchName =
+        currentName &&
+        s.student_name &&
+        s.student_name.trim().toLowerCase() === currentName.trim().toLowerCase();
+      isMatch = matchWallet || matchGuest || matchName;
+    }
+
+    if (isMatch) {
+      combined.push(s);
+      seenIds.add(sId);
+    }
+  });
+
+  // Sort latest submissions first
+  combined.sort((a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0));
+  return combined;
 };
 
 export const fetchEducatorSubmissions = async (educatorWallet) => {
@@ -160,29 +208,22 @@ export const fetchEducatorSubmissions = async (educatorWallet) => {
 
 
 export const deleteTest = async (testId, educatorWallet) => {
-  const LOCAL_STORAGE_TESTS_KEY = "edusphere_tests_v2";
-  const removeLocal = () => {
-    try {
-      const local = JSON.parse(localStorage.getItem(LOCAL_STORAGE_TESTS_KEY) || "[]");
-      const updated = local.filter(t => String(t._id) !== String(testId));
-      localStorage.setItem(LOCAL_STORAGE_TESTS_KEY, JSON.stringify(updated));
-    } catch (e) {}
-  };
+  // Always mark as deleted in browser storage and purge from local custom list
+  markTestAsDeleted(testId);
+
   try {
     const res = await axios.delete(`${API_BASE_URL}/tests/${testId}`, {
       data: { educator_wallet: educatorWallet },
       timeout: 5000
     });
     if (res.status === 200) {
-      removeLocal();
       return { success: true };
     }
   } catch (err) {
-    console.warn("Delete test backend failed, removing locally:", err.message);
-    removeLocal();
+    console.warn("Delete test backend notice (handled locally):", err.message);
     return { success: true, offlineOnly: true };
   }
-  return { success: false };
+  return { success: true };
 };
 
 const LOCAL_STORAGE_SUBMISSIONS_KEY = "edusphere_test_submissions_v1";

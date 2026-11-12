@@ -454,12 +454,12 @@ const CourseDetails = () => {
       return;
     }
 
-    let finalVideoUrl = newVideoUrl.trim();
-
-    if (!finalVideoUrl && !newVideoFile) {
-      toast.warn("Please enter a Video URL or select a video file to upload.");
+    if (!newVideoFile) {
+      toast.warn("Please select a video file to upload.");
       return;
     }
+
+    let finalVideoUrl = "";
 
     setIsUploadingVideo(true);
     setUploadStatus("Uploading video to server...");
@@ -1484,46 +1484,22 @@ const CourseDetails = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
-                    Option A: Direct Video URL (MP4 / WebM / IPFS URL)
-                  </label>
-                  <input
-                    type="text"
-                    value={newVideoUrl}
-                    onChange={(e) => {
-                      setNewVideoUrl(e.target.value);
-                      if (e.target.value) setNewVideoFile(null);
-                    }}
-                    placeholder="https://... or ipfs://..."
-                    className="w-full px-4 py-2.5 rounded-xl bg-gray-800 border border-gray-700 text-white text-sm outline-none focus:border-amber-400 transition-colors"
-                  />
-                </div>
-
-                <div className="relative flex items-center justify-center my-2">
-                  <div className="border-t border-gray-800 w-full" />
-                  <span className="bg-gray-900 px-3 text-[11px] font-bold text-gray-400 uppercase">
-                    OR
-                  </span>
-                  <div className="border-t border-gray-800 w-full" />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-gray-300 uppercase mb-1">
-                    Option B: Upload Video File
+                  <label className="block text-xs font-bold text-gray-300 uppercase mb-2">
+                    Upload Video File (MP4 / WebM) *
                   </label>
                   <input
                     type="file"
                     accept="video/*"
+                    required
                     onChange={(e) => {
                       if (e.target.files && e.target.files[0]) {
                         setNewVideoFile(e.target.files[0]);
-                        setNewVideoUrl("");
                       }
                     }}
-                    className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500 file:text-black hover:file:bg-amber-400 cursor-pointer"
+                    className="w-full text-xs text-gray-400 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-amber-500 file:text-black hover:file:bg-amber-400 cursor-pointer"
                   />
                   {newVideoFile && (
-                    <p className="text-xs text-emerald-400 mt-1 font-semibold">
+                    <p className="text-xs text-emerald-400 mt-2 font-semibold">
                       Selected: {newVideoFile.name} (
                       {(newVideoFile.size / (1024 * 1024)).toFixed(1)} MB)
                     </p>
