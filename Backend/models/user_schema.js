@@ -26,6 +26,18 @@ const UserSchema = new mongoose.Schema({
         default:100
     },
     
+    demo_upi_balance:
+    {
+        type: Number,
+        default: 1000
+    },
+    
+    inr_balance:
+    {
+        type: Number,
+        default: 1000
+    },
+    
     badge:
     {
         type:String,

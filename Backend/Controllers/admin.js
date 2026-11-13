@@ -171,11 +171,43 @@ async function DeleteCourse(req, res) {
     }
 }
 
+// ─── GET EDUCATOR INR EARNINGS & BALANCE ──────────────────────────────────────
+async function GetAdminEarnings(req, res) {
+    try {
+        let admin = req.user;
+        const wallet = req.query.wallet || req.headers["x-wallet-address"] || "";
+        const name = req.query.name || "";
+
+        if (!admin && wallet) {
+            admin = await Admins.findOne({ metamask_wallet_id: { $regex: new RegExp(`^${wallet}$`, "i") } });
+        }
+        if (!admin && name) {
+            admin = await Admins.findOne({ admin_name: { $regex: new RegExp(`^${name}$`, "i") } });
+        }
+        if (!admin) {
+            admin = await Admins.findOne();
+        }
+
+        const inrEarnings = admin ? (admin.inr_earnings || 0) : 0;
+        const inrBalance = admin ? (admin.inr_balance || 0) : 0;
+
+        return res.status(200).json({
+            success: true,
+            inr_earnings: inrEarnings,
+            inr_balance: inrBalance,
+            educator_name: admin?.admin_name || "Educator",
+            wallet_id: admin?.metamask_wallet_id || ""
+        });
+    } catch (error) {
+        return res.status(500).json({ error: "Error fetching admin earnings: " + error.message });
+    }
+}
 
 module.exports = {
     CreateAdmin,
     VerifyAdmin,
     GetCourses,
     DeleteCourse,
-    AddCourse
+    AddCourse,
+    GetAdminEarnings
 };

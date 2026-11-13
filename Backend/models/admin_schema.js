@@ -15,6 +15,14 @@ const AdminSchema = new mongoose.Schema({
     },
     
     courses_created:[{type:mongoose.Schema.ObjectId ,ref:'Courses'}],
+    inr_earnings: {
+        type: Number,
+        default: 0
+    },
+    inr_balance: {
+        type: Number,
+        default: 0
+    }
 } , {
     timestamps: true
 });

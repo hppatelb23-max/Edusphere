@@ -26,10 +26,11 @@ app.use('/uploads', express.static(uploadsDir))
 
 // Setting up middleware for parsing the request body and allowing the client to make the request
 app.use(cors({
-    origin : "*",
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],  // Optional: specify allowed HTTP methods
-    allowedHeaders: ['Content-Type', 'Authorization'],  // Optional: specify allowed headers
-  }));
+    origin: "*",
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-wallet-address', 'x-requested-with', 'Accept'],
+}));
+app.options('*', cors());
 app.use(express.json({ limit: '100mb' }))
 app.use(express.urlencoded({ extended: true, limit: '100mb' }))
 

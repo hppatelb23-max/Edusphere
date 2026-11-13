@@ -486,24 +486,64 @@ export const getRandomQuestionsForTest = (test, count) => {
   return shuffled.slice(0, numToPick);
 };
 
+// Helper to normalize option index
+export const normalizeOptionIndex = (val, options = []) => {
+  if (val === undefined || val === null || val === -1 || val === "-1") return -1;
+  if (typeof val === "number" && !isNaN(val)) return val;
+  const str = String(val).trim();
+  if (/^\d+$/.test(str)) return parseInt(str, 10);
+  const letterMap = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, a: 0, b: 1, c: 2, d: 3, e: 4, f: 5 };
+  if (letterMap[str] !== undefined) return letterMap[str];
+  if (Array.isArray(options)) {
+    const found = options.findIndex(o => String(o).trim().toLowerCase() === str.toLowerCase());
+    if (found !== -1) return found;
+  }
+  return -1;
+};
+
 // Grade student submission offline fallback
 export const gradeTestSubmissionLocally = (test, answers, studentWallet) => {
   let correctCount = 0;
   const detailedReview = [];
 
-  answers.forEach((ans) => {
-    const originalQ = test.questions.find(q => (q._id || q.question) === (ans.question_id || ans.question));
+  answers.forEach((ans, ansIdx) => {
+    let originalQ = test.questions.find(q =>
+      (q._id && ans.question_id && String(q._id) === String(ans.question_id)) ||
+      (q.question && ans.question_id && q.question.trim().toLowerCase() === String(ans.question_id).trim().toLowerCase()) ||
+      (q.question && ans.question && q.question.trim().toLowerCase() === String(ans.question).trim().toLowerCase())
+    );
+    // Fallback: match by question index
+    if (!originalQ && typeof ans.question_index === "number" && test.questions[ans.question_index]) {
+      originalQ = test.questions[ans.question_index];
+    }
+    if (!originalQ && test.questions && test.questions[ansIdx]) {
+      originalQ = test.questions[ansIdx];
+    }
     if (originalQ) {
-      const isCorrect = originalQ.correct_option === ans.selected_option;
+      const optionsList = Array.isArray(originalQ.options) ? originalQ.options : [];
+      const correctOptIdx = normalizeOptionIndex(originalQ.correct_option, optionsList);
+      const selectedOptIdx = normalizeOptionIndex(ans.selected_option, optionsList);
+
+      let isCorrect = false;
+      if (correctOptIdx !== -1 && selectedOptIdx !== -1) {
+        isCorrect = (correctOptIdx === selectedOptIdx);
+      } else if (optionsList.length > 0) {
+        const correctText = String(optionsList[correctOptIdx] || originalQ.correct_option || "").trim().toLowerCase();
+        const selectedText = String(optionsList[selectedOptIdx] || ans.selected_option || "").trim().toLowerCase();
+        if (correctText && selectedText && correctText === selectedText) {
+          isCorrect = true;
+        }
+      }
+
       if (isCorrect) correctCount++;
       detailedReview.push({
         question_id: originalQ._id || originalQ.question,
         question: originalQ.question,
         question_image: originalQ.question_image || "",
-        options: originalQ.options,
+        options: optionsList,
         option_images: originalQ.option_images || [],
-        selected_option: ans.selected_option,
-        correct_option: originalQ.correct_option,
+        selected_option: selectedOptIdx,
+        correct_option: correctOptIdx !== -1 ? correctOptIdx : 0,
         is_correct: isCorrect,
         explanation: originalQ.explanation || "No explanation provided."
       });

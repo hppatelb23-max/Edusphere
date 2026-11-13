@@ -25,7 +25,15 @@ import {
   FiVolumeX,
   FiMaximize,
   FiMinimize,
-  FiSettings
+  FiSettings,
+  FiSmartphone,
+  FiPrinter,
+  FiFileText,
+  FiDownload,
+  FiClock,
+  FiX,
+  FiRefreshCw,
+  FiCreditCard
 } from "react-icons/fi";
 import { useTheme } from "next-themes";
 import { useThemeStore } from "../store/themeStore";
@@ -35,6 +43,7 @@ import { contractAbi, contractAddress } from "../utils/constants";
 import { useWriteContract } from "wagmi";
 import { toast } from "react-toastify";
 import { API_BASE_URL, getCookie } from "../utils/api";
+import { ethers } from "ethers";
 
 const CourseDetails = () => {
   const { id } = useParams();
@@ -58,6 +67,26 @@ const CourseDetails = () => {
   // Purchasing & Enrollment State
   const [isPurchased, setIsPurchased] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
+  const [billData, setBillData] = useState(null);
+  const [showBillModal, setShowBillModal] = useState(false);
+  const [isRazorpayLoading, setIsRazorpayLoading] = useState(false);
+  const [showGatewayModal, setShowGatewayModal] = useState(false);
+  const [activeGatewayOrder, setActiveGatewayOrder] = useState(null);
+  const [isVerifyingGateway, setIsVerifyingGateway] = useState(false);
+  const [gatewayTab, setGatewayTab] = useState("upi"); // "upi" | "card" | "netbanking"
+  const [upiSubTab, setUpiSubTab] = useState("qr"); // "qr" | "vpa" | "apps"
+  const [userVpa, setUserVpa] = useState("");
+  const [paymentStep, setPaymentStep] = useState("selection"); // "selection" | "processing" | "success"
+  const [countdown, setCountdown] = useState(300);
+  const [demoUpiCash, setDemoUpiCash] = useState(() => {
+    const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
+    return saved ? Number(saved) : 1000;
+  });
+  const [upiPin, setUpiPin] = useState("");
+  const [educatorBillData, setEducatorBillData] = useState(null);
+  const [activeReceiptTab, setActiveReceiptTab] = useState("student"); // "student" | "educator"
+
+
 
   // Video Player Controls State
   const videoRef = useRef(null);
@@ -221,6 +250,392 @@ const CourseDetails = () => {
         .catch(() => {});
     }
   }, [course?._id, course?.title, id, walletAddress]);
+
+  // Independent Pricing — INR and ETH are set separately by educator, no forced conversion
+  const exactAmountInr = course?.price_inr !== undefined && Number(course.price_inr) > 0
+    ? Number(course.price_inr)
+    : (course?.currency === "INR" && Number(course?.course_price) > 0 ? Number(course?.course_price) : 499);
+  const exactAmountEth = course?.price_eth !== undefined && Number(course.price_eth) > 0
+    ? Number(course.price_eth)
+    : (course?.currency !== "INR" && Number(course?.course_price) > 0 ? Number(course?.course_price) : 0.05);
+
+  // Countdown timer for UPI Gateway processing step
+  useEffect(() => {
+    let timer;
+    if (paymentStep === "processing" && countdown > 0) {
+      timer = setInterval(() => {
+        setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [paymentStep, countdown]);
+
+  // Fetch student's Demo UPI Cash balance from backend / localStorage
+  const fetchDemoCash = async () => {
+    try {
+      const token = getCookie("user");
+      const res = await axios.get(`${API_BASE_URL}/user/demo-upi-balance`, {
+        params: {
+          wallet: walletAddress || "",
+          name: localStorage.getItem("username") || ""
+        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.data?.demo_balance !== undefined) {
+        setDemoUpiCash(res.data.demo_balance);
+        localStorage.setItem("demo_upi_cash", String(res.data.demo_balance));
+      }
+    } catch (e) {
+      const saved = localStorage.getItem("demo_upi_cash");
+      setDemoUpiCash(saved ? Number(saved) : 10000);
+    }
+  };
+
+  useEffect(() => {
+    fetchDemoCash();
+  }, [walletAddress]);
+
+  const handleAddDemoCash = async (amt = 500) => {
+    try {
+      const token = getCookie("user");
+      const res = await axios.post(
+        `${API_BASE_URL}/user/demo-upi-add-cash`,
+        {
+          amount: amt,
+          wallet: walletAddress || "",
+          name: localStorage.getItem("username") || ""
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        }
+      );
+      const newBal = res.data?.new_balance !== undefined ? res.data.new_balance : (demoUpiCash + amt);
+      setDemoUpiCash(newBal);
+      localStorage.setItem("student_inr_cash", String(newBal));
+      localStorage.setItem("demo_upi_cash", String(newBal));
+      toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+    } catch (e) {
+      const newBal = demoUpiCash + amt;
+      setDemoUpiCash(newBal);
+      localStorage.setItem("student_inr_cash", String(newBal));
+      localStorage.setItem("demo_upi_cash", String(newBal));
+      toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+    }
+  };
+
+  // Helper to dynamically load Razorpay script if needed
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  // Verification function called on payment success
+  const verifyAndEnroll = async (paymentResponse) => {
+    const token = getCookie("user");
+    const studentName =
+      localStorage.getItem("username") ||
+      localStorage.getItem("studentName") ||
+      "Student";
+
+    setIsVerifyingGateway(true);
+    try {
+      toast.info("Verifying UPI payment with Razorpay gateway...");
+      const verifyRes = await axios.post(
+        `${API_BASE_URL}/user/razorpay-verify`,
+        {
+          razorpay_order_id: paymentResponse.razorpay_order_id || activeGatewayOrder?.id || `order_${Date.now()}`,
+          razorpay_payment_id: paymentResponse.razorpay_payment_id,
+          razorpay_signature: paymentResponse.razorpay_signature || "simulated_sig",
+          course_id: course?._id || id,
+          student_wallet: walletAddress || "",
+          student_name: studentName,
+          amount: exactAmountInr
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          }
+        }
+      );
+
+      if (verifyRes.data?.enrolled || verifyRes.data?.success) {
+        // Deduct from local student INR cash balance
+        const updatedCash = verifyRes.data?.student_remaining_balance !== undefined
+          ? verifyRes.data.student_remaining_balance
+          : Math.max(0, demoUpiCash - exactAmountInr);
+        setDemoUpiCash(updatedCash);
+        try {
+          localStorage.setItem("student_inr_cash", String(updatedCash));
+          localStorage.setItem("demo_upi_cash", String(updatedCash));
+        } catch (e) {}
+        setUpiPin("");
+
+        // Persist educator revenue
+        if (verifyRes.data?.educator_total_earnings !== undefined) {
+          try {
+            localStorage.setItem("educator_inr_earnings", String(verifyRes.data.educator_total_earnings));
+          } catch (e) {}
+        }
+
+        // Persist enrollment in localStorage
+        try {
+          const stored = localStorage.getItem("enrolled_courses");
+          const list = stored ? JSON.parse(stored) : [];
+          const cid = course?._id || id;
+          if (!list.includes(cid)) list.push(cid);
+          localStorage.setItem("enrolled_courses", JSON.stringify(list));
+        } catch (e) {}
+
+        setIsPurchased(true);
+        setShowGatewayModal(false);
+        setPaymentStep("selection");
+
+        // Dual Receipts: Student & Educator
+        const studentRec = verifyRes.data?.receipt || {
+          invoice_no: `EDUPAY-${Date.now().toString().slice(-6)}`,
+          student_name: studentName,
+          educator_name: course?.author_name || "Educator",
+          course_title: course?.title || "Course",
+          amount: exactAmountInr,
+          currency: "INR",
+          payment_method: "Indian Rupees (₹ Cash)",
+          payment_id: paymentResponse.razorpay_payment_id,
+          transaction_id: paymentResponse.razorpay_payment_id,
+          date: new Date().toLocaleString("en-IN"),
+          status: "PAID & ENROLLED IN INDIAN RUPEES (₹)"
+        };
+        const educatorRec = verifyRes.data?.educator_receipt || {
+          voucher_no: `EDUEARN-${Date.now().toString().slice(-6)}`,
+          educator_name: course?.author_name || "Educator",
+          student_name: studentName,
+          course_title: course?.title || "Course",
+          amount_credited: exactAmountInr,
+          currency: "INR",
+          payment_id: paymentResponse.razorpay_payment_id,
+          date: new Date().toLocaleString("en-IN"),
+          status: "CREDITED TO EDUCATOR REVENUE (₹)"
+        };
+
+        setBillData(studentRec);
+        setEducatorBillData(educatorRec);
+        setShowBillModal(true);
+
+        toast.success(`🎉 Paid ₹${exactAmountInr} INR! Credited to Educator (${course?.author_name || "Educator"}). Remaining Balance: ₹${updatedCash}`);
+      } else {
+        toast.error(verifyRes.data?.error || "Payment verification failed.");
+      }
+    } catch (vErr) {
+      console.error("Verification error:", vErr);
+      toast.error(vErr.response?.data?.error || "Payment verification failed.");
+    } finally {
+      setIsVerifyingGateway(false);
+    }
+  };
+
+  // ── Indian Rupees Direct Checkout Modal Trigger ────────────────
+  const handleOpenRupeeModal = () => {
+    setShowGatewayModal(true);
+  };
+
+
+
+  // ─── DOWNLOADABLE PAYMENT RECEIPT GENERATOR (BOTH UPI & ETH) ──────────────────
+  const downloadReceipt = (receipt) => {
+    if (!receipt) return;
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Edusphere Tax Invoice - ${receipt.invoice_no || "Receipt"}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #0b0f19; color: #f3f4f6; padding: 40px 20px; margin: 0; }
+    .receipt-container { max-width: 640px; margin: 0 auto; background: #111827; border: 1px solid #374151; border-radius: 20px; padding: 36px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+    .header { text-align: center; border-bottom: 2px dashed #4b5563; padding-bottom: 24px; margin-bottom: 24px; }
+    .logo { font-size: 26px; font-weight: 900; color: #f59e0b; letter-spacing: -0.5px; margin: 0; }
+    .badge { display: inline-block; background: #065f46; color: #34d399; font-size: 11px; font-weight: 800; padding: 4px 14px; border-radius: 9999px; text-transform: uppercase; margin-top: 10px; border: 1px solid #059669; }
+    .invoice-meta { font-size: 13px; color: #9ca3af; margin-top: 8px; }
+    .banner { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 14px; padding: 14px; text-align: center; margin-bottom: 24px; font-weight: bold; color: #10b981; font-size: 15px; }
+    .item-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .item-table tr { border-bottom: 1px solid #1f2937; }
+    .item-table td { padding: 12px 6px; font-size: 13px; }
+    .item-table td.label { color: #9ca3af; font-weight: 500; width: 40%; }
+    .item-table td.val { color: #ffffff; font-weight: 700; text-align: right; }
+    .highlight { color: #10b981; font-size: 16px; font-weight: 900; }
+    .hash-val { font-family: monospace; font-size: 11px; color: #38bdf8; word-break: break-all; }
+    .footer { text-align: center; border-top: 1px solid #1f2937; padding-top: 20px; font-size: 11px; color: #6b7280; line-height: 1.6; }
+    @media print {
+      body { background: #ffffff; color: #111827; padding: 0; }
+      .receipt-container { border: 1px solid #e5e7eb; background: #ffffff; box-shadow: none; color: #111827; }
+      .logo { color: #d97706; }
+      .item-table td.label { color: #4b5563; }
+      .item-table td.val { color: #111827; }
+      .hash-val { color: #0284c7; }
+      .banner { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-container">
+    <div class="header">
+      <h1 class="logo">EDUSPHERE</h1>
+      <div class="badge">Official Course Enrollment Receipt</div>
+      <div class="invoice-meta">Invoice No: <strong style="color: #f59e0b;">${receipt.invoice_no || "N/A"}</strong> &bull; Date: ${receipt.date || new Date().toLocaleString()}</div>
+    </div>
+    <div class="banner">
+      ✓ Verified & Cryptographically Recorded on Blockchain Ledger
+    </div>
+    <table class="item-table">
+      <tr>
+        <td class="label">Student Name:</td>
+        <td class="val">${receipt.student_name || "Student"}</td>
+      </tr>
+      <tr>
+        <td class="label">Course Title:</td>
+        <td class="val">${receipt.course_title || "Course"}</td>
+      </tr>
+      <tr>
+        <td class="label">Amount Paid:</td>
+        <td class="val highlight">${receipt.currency === "INR" ? "₹" + receipt.amount + " INR" : receipt.amount + " ETH"}</td>
+      </tr>
+      <tr>
+        <td class="label">Payment Method:</td>
+        <td class="val">${receipt.payment_method || "Online"}</td>
+      </tr>
+      ${receipt.transaction_id || receipt.payment_id ? `
+      <tr>
+        <td class="label">Payment / Transaction ID:</td>
+        <td class="val hash-val">${receipt.transaction_id || receipt.payment_id}</td>
+      </tr>` : ""}
+      ${receipt.bank_utr ? `
+      <tr>
+        <td class="label">Bank Reference / UTR:</td>
+        <td class="val hash-val">${receipt.bank_utr}</td>
+      </tr>` : ""}
+      ${receipt.student_wallet ? `
+      <tr>
+        <td class="label">Student Wallet Address:</td>
+        <td class="val hash-val">${receipt.student_wallet}</td>
+      </tr>` : ""}
+      <tr>
+        <td class="label">Blockchain Transaction Hash:</td>
+        <td class="val hash-val">${receipt.blockchain_hash || receipt.transaction_id || "Recorded on Blockchain"}</td>
+      </tr>
+      <tr>
+        <td class="label">Enrollment Status:</td>
+        <td class="val" style="color: #10b981;">✓ ${receipt.status || "CONFIRMED & UNLOCKED"}</td>
+      </tr>
+    </table>
+    <div class="footer">
+      <p>This document serves as proof of course purchase and ownership registered on the Ethereum Blockchain network & Edusphere LMS.</p>
+      <p>&copy; 2026 Edusphere Platform. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Edusphere_Receipt_${receipt.invoice_no || "Course"}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Receipt downloaded successfully!");
+  };
+
+  const downloadEducatorReceipt = (receipt) => {
+    if (!receipt) return;
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Edusphere Educator Credit Voucher - ${receipt.voucher_no || "Voucher"}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: #0b0f19; color: #f3f4f6; padding: 40px 20px; margin: 0; }
+    .receipt-container { max-width: 640px; margin: 0 auto; background: #111827; border: 1px solid #374151; border-radius: 20px; padding: 36px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7); }
+    .header { text-align: center; border-bottom: 2px dashed #4b5563; padding-bottom: 24px; margin-bottom: 24px; }
+    .logo { font-size: 26px; font-weight: 900; color: #10b981; letter-spacing: -0.5px; margin: 0; }
+    .badge { display: inline-block; background: #065f46; color: #34d399; font-size: 11px; font-weight: 800; padding: 4px 14px; border-radius: 9999px; text-transform: uppercase; margin-top: 10px; border: 1px solid #059669; }
+    .invoice-meta { font-size: 13px; color: #9ca3af; margin-top: 8px; }
+    .banner { background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.35); border-radius: 14px; padding: 14px; text-align: center; margin-bottom: 24px; font-weight: bold; color: #10b981; font-size: 15px; }
+    .item-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+    .item-table tr { border-bottom: 1px solid #1f2937; }
+    .item-table td { padding: 12px 6px; font-size: 13px; }
+    .item-table td.label { color: #9ca3af; font-weight: 500; width: 40%; }
+    .item-table td.val { color: #ffffff; font-weight: 700; text-align: right; }
+    .highlight { color: #10b981; font-size: 18px; font-weight: 900; }
+    .hash-val { font-family: monospace; font-size: 11px; color: #38bdf8; word-break: break-all; }
+    .footer { text-align: center; border-top: 1px solid #1f2937; padding-top: 20px; font-size: 11px; color: #6b7280; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="receipt-container">
+    <div class="header">
+      <h1 class="logo">EDUSPHERE</h1>
+      <div class="badge">Official Educator Earning Voucher</div>
+      <div class="invoice-meta">Voucher No: <strong style="color: #10b981;">${receipt.voucher_no || "N/A"}</strong> &bull; Date: ${receipt.date || new Date().toLocaleString("en-IN")}</div>
+    </div>
+    <div class="banner">
+      ✓ Revenue Credited to Educator Wallet (Indian Rupees ₹)
+    </div>
+    <table class="item-table">
+      <tr>
+        <td class="label">Educator Name:</td>
+        <td class="val">${receipt.educator_name || "Educator"}</td>
+      </tr>
+      <tr>
+        <td class="label">Course Title:</td>
+        <td class="val">${receipt.course_title || "Course"}</td>
+      </tr>
+      <tr>
+        <td class="label">Enrolled Student:</td>
+        <td class="val">${receipt.student_name || "Student"}</td>
+      </tr>
+      <tr>
+        <td class="label">Amount Credited:</td>
+        <td class="val highlight">+₹${receipt.amount_credited || receipt.amount || 0} INR</td>
+      </tr>
+      <tr>
+        <td class="label">Payment ID:</td>
+        <td class="val hash-val">${receipt.payment_id || "N/A"}</td>
+      </tr>
+      <tr>
+        <td class="label">Payout Status:</td>
+        <td class="val" style="color: #10b981;">✓ ${receipt.status || "CREDITED TO EDUCATOR REVENUE"}</td>
+      </tr>
+    </table>
+    <div class="footer">
+      <p>This voucher certifies revenue distribution credited to the educator on the Edusphere LMS platform.</p>
+      <p>&copy; 2026 Edusphere Platform. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+    const blob = new Blob([htmlContent], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Edusphere_Educator_Voucher_${receipt.voucher_no || Date.now()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("📥 Educator Voucher downloaded!");
+  };
+
+
 
   // Video List normalization
   const rawVideos = course?.course_video;
@@ -665,6 +1080,25 @@ const CourseDetails = () => {
       }
 
       setIsPurchased(true);
+
+      // Prepare official bill / receipt for ETH purchase
+      const studentDisplayName = localStorage.getItem("username") || localStorage.getItem("studentName") || "Hitanshu";
+      const receipt = {
+        invoice_no: `EDUPAY-${Date.now().toString().slice(-6)}`,
+        student_name: studentDisplayName,
+        course_title: course?.title || "Enrolled Course",
+        amount: validPrice,
+        currency: "ETH",
+        payment_method: "Ethereum (MetaMask)",
+        transaction_id: txHash,
+        student_wallet: walletAddress,
+        blockchain_hash: txHash,
+        date: new Date().toLocaleString(),
+        status: "PAID & VERIFIED ON-CHAIN"
+      };
+      setBillData(receipt);
+      setShowBillModal(true);
+
       toast.success(
         `Success! Course unlocked! Enrolled with ${validPrice} ETH.`
       );
@@ -968,47 +1402,68 @@ const CourseDetails = () => {
 
               <div className="flex items-center justify-between">
                 <span className="text-gray-400 font-medium">Price:</span>
-                <span className="font-extrabold text-amber-400 text-sm">
-                  {course.course_price ? `${course.course_price} ETH` : "Free"}
-                </span>
+                <div className="text-right">
+                  <span className="font-extrabold text-amber-400 text-sm block">
+                    {course.currency === "INR" ? `₹${exactAmountInr} INR` : `${exactAmountEth} ETH`}
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-mono block">
+                    {course.currency === "INR" ? `~${exactAmountEth} ETH` : `~₹${exactAmountInr} INR`}
+                  </span>
+                </div>
               </div>
             </div>
 
-            {/* Buy Action Button for Students */}
+            {/* Buy Action Buttons for Students */}
             {!isEducator && (
-              <div className="mt-6 pt-4 border-t border-gray-800">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handlePurchase}
-                  disabled={isPurchased || isBuying}
-                  className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all ${
-                    isPurchased
-                      ? "bg-emerald-500 text-black cursor-default"
-                      : isBuying
-                      ? "bg-amber-600/70 text-white cursor-wait"
-                      : "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-amber-500/25"
-                  }`}
-                >
-                  {isPurchased ? (
-                    <>
-                      <FiCheckCircle className="w-4 h-4" />
-                      <span>Enrolled & Course Unlocked</span>
-                    </>
-                  ) : isBuying ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Confirming in MetaMask...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiLock className="w-4 h-4" />
-                      <span>
-                        Enroll & Unlock ({course.course_price || 0.05} ETH)
-                      </span>
-                    </>
-                  )}
-                </motion.button>
+              <div className="mt-6 pt-4 border-t border-gray-800 space-y-3">
+                {isPurchased ? (
+                  <div className="w-full py-3.5 rounded-xl font-bold text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center gap-2">
+                    <FiCheckCircle className="w-4 h-4" />
+                    <span>Enrolled & Course Unlocked</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {/* Student Rupee Balance Quick Indicator */}
+                    <div className="flex items-center justify-between text-xs px-1 text-gray-400">
+                      <span>Your Rupee Balance:</span>
+                      <span className="font-extrabold text-emerald-400">₹{Number(demoUpiCash).toLocaleString("en-IN")} INR</span>
+                    </div>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleOpenRupeeModal}
+                      className="w-full py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <FiDollarSign className="w-4 h-4" />
+                      <span>⚡ Buy with Indian Rupees (₹{exactAmountInr})</span>
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handlePurchase}
+                      disabled={isBuying}
+                      className={`w-full py-2.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-2 transition-all ${
+                        isBuying
+                          ? "bg-amber-600/70 text-white cursor-wait border-amber-600"
+                          : "bg-gray-800 hover:bg-gray-700 text-amber-300 border-amber-500/40"
+                      }`}
+                    >
+                      {isBuying ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Confirming in MetaMask...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiUnlock className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Enroll with ETH ({exactAmountEth} ETH)</span>
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1041,37 +1496,58 @@ const CourseDetails = () => {
                     Enroll to Watch Lectures
                   </h2>
 
-                  <p className="text-xs sm:text-sm text-gray-300 mb-6 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-gray-300 mb-5 leading-relaxed">
                     This course contains {videosList.length || 1} video lectures.
-                    Students must enroll by purchasing with ETH via MetaMask to
-                    unlock full video streaming and course material.
+                    Enroll with Indian Rupees (₹{exactAmountInr}) or Ethereum MetaMask ({exactAmountEth} ETH) to unlock and watch all lectures.
                   </p>
 
-                  <div className="flex items-center gap-3 mb-6 px-4 py-2 rounded-xl bg-black/60 border border-amber-500/30 backdrop-blur-sm">
-                    <span className="text-xs text-gray-400">Price:</span>
-                    <span className="text-base sm:text-lg font-black text-amber-400">
-                      {course?.course_price ? `${course.course_price} ETH` : "0.05 ETH"}
-                    </span>
+                  <div className="flex items-center gap-4 sm:gap-6 mb-5 px-6 py-2.5 rounded-2xl bg-black/70 border border-amber-500/30 backdrop-blur-md">
+                    <div className="text-center">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider block">⚡ Indian Rupees (₹)</span>
+                      <span className="text-base sm:text-lg font-black text-emerald-400">₹{exactAmountInr}</span>
+                    </div>
+                    <div className="w-px h-8 bg-gray-700" />
+                    <div className="text-center">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider block">⟠ MetaMask</span>
+                      <span className="text-base sm:text-lg font-black text-amber-400">{exactAmountEth} ETH</span>
+                    </div>
                   </div>
 
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={handlePurchase}
-                    disabled={isBuying}
-                    className={`px-8 py-3.5 rounded-xl font-bold text-sm shadow-xl flex items-center justify-center gap-2 transition-all ${
-                      isBuying
-                        ? "bg-amber-600 text-white cursor-wait"
-                        : "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-amber-500/25"
-                    }`}
-                  >
-                    <FiUnlock className="w-4 h-4" />
-                    <span>
-                      {isBuying
-                        ? "Confirming in MetaMask..."
-                        : `Enroll with ETH (${course?.course_price || 0.05} ETH)`}
-                    </span>
-                  </motion.button>
+                  <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleOpenRupeeModal}
+                      className="px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                    >
+                      <FiDollarSign className="w-4 h-4" />
+                      <span>⚡ Buy with Indian Rupees (₹{exactAmountInr})</span>
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handlePurchase}
+                      disabled={isBuying}
+                      className={`px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+                        isBuying
+                          ? "bg-amber-600 text-white cursor-wait"
+                          : "bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20"
+                      }`}
+                    >
+                      {isBuying ? (
+                        <>
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                          <span>Confirming in MetaMask...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiUnlock className="w-4 h-4" />
+                          <span>⟠ Enroll with ETH — {exactAmountEth} ETH</span>
+                        </>
+                      )}
+                    </motion.button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1530,6 +2006,365 @@ const CourseDetails = () => {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+
+
+
+
+      {/* ── Buy with Indian Rupees (₹) Modal ──────────────────────────── */}
+      <AnimatePresence>
+        {showGatewayModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 15 }}
+              className="w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border border-emerald-500/30 bg-gray-900 text-white flex flex-col max-h-[92vh]"
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-950 px-6 py-5 flex items-center justify-between text-white shrink-0 border-b border-emerald-600/30">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-black flex items-center justify-center font-black text-xl shadow">
+                    ₹
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base sm:text-lg leading-tight tracking-tight">
+                      Buy with Indian Rupees (₹)
+                    </h3>
+                    <p className="text-[11px] text-emerald-200">
+                      Direct Student-to-Educator Transfer
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <span className="text-[10px] text-emerald-200 uppercase tracking-wider block">Course Price</span>
+                    <span className="text-xl font-black text-white">₹{exactAmountInr}</span>
+                  </div>
+                  <button
+                    onClick={() => setShowGatewayModal(false)}
+                    className="p-1.5 rounded-lg text-emerald-200 hover:text-white hover:bg-white/10 transition-colors"
+                  >
+                    <FiX className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Main Content Area */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                {/* Course Details Card */}
+                <div className="p-4 rounded-2xl bg-gray-800/80 border border-gray-700 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400 uppercase text-[10px] font-bold tracking-wider">Course Name</span>
+                    <span className="text-emerald-400 font-bold font-mono">₹{exactAmountInr} INR</span>
+                  </div>
+                  <h4 className="font-bold text-white text-base leading-snug">{course?.title}</h4>
+                  <div className="flex items-center justify-between text-xs text-gray-400 pt-1 border-t border-gray-700/60">
+                    <span>Educator / Author:</span>
+                    <span className="text-amber-400 font-semibold">{course?.author_name || "Educator"}</span>
+                  </div>
+                </div>
+
+                {/* Balance & Deduction Breakdown Card */}
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-gray-900 to-gray-800 border border-emerald-500/40 shadow-inner space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
+                        Student Rupee Balance
+                      </span>
+                      <div className="text-2xl font-black text-white mt-0.5">
+                        ₹{Number(demoUpiCash).toLocaleString("en-IN")}{" "}
+                        <span className="text-xs font-normal text-gray-400">INR</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleAddDemoCash(500)}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[11px] shadow transition-all active:scale-95"
+                      >
+                        + ₹500
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddDemoCash(1000)}
+                        className="px-2.5 py-1.5 rounded-xl bg-emerald-500/80 hover:bg-emerald-400 text-black font-extrabold text-[11px] shadow transition-all active:scale-95"
+                      >
+                        + ₹1,000
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Transfer Breakdown */}
+                  <div className="space-y-1.5 pt-2 border-t border-gray-700/60 text-xs">
+                    <div className="flex justify-between text-gray-300">
+                      <span>Deduction from Student:</span>
+                      <span className="text-red-400 font-bold">- ₹{exactAmountInr} INR</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Credit to Educator ({course?.author_name || "Educator"}):</span>
+                      <span className="text-emerald-400 font-bold">+ ₹{exactAmountInr} INR</span>
+                    </div>
+                    <div className="flex justify-between text-white font-semibold pt-1 border-t border-gray-700/40">
+                      <span>Student Remaining Balance:</span>
+                      <span className="text-amber-400 font-bold">
+                        ₹{Number(Math.max(0, demoUpiCash - exactAmountInr)).toLocaleString("en-IN")} INR
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Insufficient balance alert */}
+                {demoUpiCash < exactAmountInr && (
+                  <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-red-300 text-xs text-center font-medium">
+                    ⚠️ Insufficient balance! Click <strong>+ ₹500</strong> or <strong>+ ₹1,000</strong> above to top up.
+                  </div>
+                )}
+
+                {/* Pay Action Button */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (demoUpiCash < exactAmountInr) {
+                        toast.error("Insufficient Indian Rupees! Please add money first.");
+                        return;
+                      }
+                      const simId = `inr_pay_${Date.now().toString().slice(-8)}_${Math.floor(Math.random() * 900 + 100)}`;
+                      verifyAndEnroll({
+                        razorpay_order_id: `order_inr_${Date.now()}`,
+                        razorpay_payment_id: simId,
+                        razorpay_signature: "inr_direct_verified"
+                      });
+                    }}
+                    disabled={isVerifyingGateway || demoUpiCash < exactAmountInr}
+                    className="w-full py-4 rounded-2xl font-black text-sm bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-400 hover:from-emerald-400 hover:to-teal-300 text-black shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isVerifyingGateway ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                        <span>Transferring ₹{exactAmountInr} & Unlocking Course...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiCheckCircle className="w-5 h-5" />
+                        <span>✓ Confirm & Pay ₹{exactAmountInr} (Indian Rupees)</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="bg-gray-950 px-6 py-3 border-t border-gray-800 flex items-center justify-between text-[11px] text-gray-400 shrink-0">
+                <span className="flex items-center gap-1.5">
+                  <FiShield className="text-emerald-400" />
+                  <span>Instant Student-to-Educator Settlement</span>
+                </span>
+                <span>Official Receipts Generated</span>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ══════════════════════════════════════════════════════════════════
+          STUDENT OFFICIAL BILL / INVOICE RECEIPT MODAL
+         ══════════════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {showBillModal && billData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="max-w-lg w-full rounded-3xl p-6 sm:p-8 bg-gray-900 border border-amber-400/40 text-white shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setShowBillModal(false)}
+                className="absolute top-5 right-5 p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-colors text-lg"
+              >
+                ✕
+              </button>
+
+              {/* Receipt Header */}
+              <div className="text-center mb-5">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-400/30 mb-2">
+                  <FiFileText className="w-3.5 h-3.5" />
+                  <span>Official Transaction Records (Dual Receipts)</span>
+                </div>
+                <h3 className="text-2xl font-black text-white">
+                  {activeReceiptTab === "student" ? "Edusphere Tax Invoice" : "Educator Earning Voucher"}
+                </h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Record ID: <strong className="text-amber-400 font-mono">{activeReceiptTab === "student" ? billData.invoice_no : (educatorBillData?.voucher_no || billData.invoice_no)}</strong>
+                </p>
+              </div>
+
+              {/* Dual Tab Switcher: Student Receipt & Educator Receipt */}
+              <div className="flex border-b border-gray-800 mb-5 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setActiveReceiptTab("student")}
+                  className={`flex-1 py-2.5 border-b-2 transition-all ${
+                    activeReceiptTab === "student"
+                      ? "border-amber-400 text-amber-400 bg-amber-500/10 rounded-t-xl"
+                      : "border-transparent text-gray-400 hover:text-white"
+                  }`}
+                >
+                  🎓 Student Purchase Invoice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveReceiptTab("educator")}
+                  className={`flex-1 py-2.5 border-b-2 transition-all ${
+                    activeReceiptTab === "educator"
+                      ? "border-emerald-400 text-emerald-400 bg-emerald-500/10 rounded-t-xl"
+                      : "border-transparent text-gray-400 hover:text-white"
+                  }`}
+                >
+                  👨‍🏫 Educator Credit Voucher
+                </button>
+              </div>
+
+              {/* Highlight Banner */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-amber-500/20 border border-amber-500/30 mb-5 text-center">
+                <span className="text-[11px] text-gray-300 block mb-0.5 uppercase tracking-wider">
+                  {activeReceiptTab === "student" ? "Student Purchase Confirmation" : "Educator Revenue Credit Confirmation"}
+                </span>
+                <p className="text-base sm:text-lg font-black text-white">
+                  {activeReceiptTab === "student" ? (
+                    <>
+                      🎉 <span className="text-amber-400">{billData.student_name}</span> purchased{" "}
+                      <span className="text-white">"{billData.course_title}"</span> for{" "}
+                      <span className="text-emerald-400">
+                        {billData.currency === "INR" ? `₹${billData.amount} INR` : `${billData.amount} ETH`}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      💰 Credited <span className="text-emerald-400">+₹{billData.amount} INR</span> to educator{" "}
+                      <span className="text-amber-400">{educatorBillData?.educator_name || course?.author_name || "Educator"}</span> for sale of{" "}
+                      <span className="text-white">"{billData.course_title}"</span>!
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* Itemized Receipt Table */}
+              <div className="p-4 rounded-2xl bg-black/60 border border-gray-800 space-y-2.5 text-xs mb-6 font-mono">
+                {activeReceiptTab === "student" ? (
+                  <>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Student Name:</span>
+                      <span className="text-white font-bold">{billData.student_name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Educator / Faculty:</span>
+                      <span className="text-amber-400 font-bold">{educatorBillData?.educator_name || course?.author_name || "Educator"}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Course Enrolled:</span>
+                      <span className="text-amber-400 font-bold truncate max-w-[200px]">{billData.course_title}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Amount Deducted:</span>
+                      <span className="text-emerald-400 font-bold text-sm">
+                        {billData.currency === "INR" ? `₹${billData.amount} INR` : `${billData.amount} ETH`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Payment Method:</span>
+                      <span className="text-white font-bold">{billData.payment_method}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Date & Time:</span>
+                      <span className="text-gray-300">{billData.date}</span>
+                    </div>
+                    <div className="flex justify-between pt-1">
+                      <span className="text-gray-400 font-sans">Status:</span>
+                      <span className="text-emerald-400 font-bold uppercase tracking-wider">
+                        ✓ {billData.status || "CONFIRMED & UNLOCKED"}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Educator Name:</span>
+                      <span className="text-emerald-400 font-bold">{educatorBillData?.educator_name || course?.author_name || "Educator"}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Purchased By Student:</span>
+                      <span className="text-white font-bold">{billData.student_name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Course Title:</span>
+                      <span className="text-amber-400 font-bold truncate max-w-[200px]">{billData.course_title}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Revenue Credited:</span>
+                      <span className="text-emerald-400 font-black text-sm">+₹{billData.amount} INR</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Payment Reference:</span>
+                      <span className="text-cyan-300 font-mono text-[10px] truncate max-w-[200px]">{billData.payment_id || billData.transaction_id}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-gray-800 pb-2">
+                      <span className="text-gray-400 font-sans">Credit Date:</span>
+                      <span className="text-gray-300">{billData.date}</span>
+                    </div>
+                    <div className="flex justify-between pt-1">
+                      <span className="text-gray-400 font-sans">Settlement Status:</span>
+                      <span className="text-emerald-400 font-bold uppercase tracking-wider">
+                        ✓ CREDITED TO EDUCATOR REVENUE
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Action Buttons: Download Receipt / Print / Start Learning */}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeReceiptTab === "student") {
+                      downloadReceipt(billData);
+                    } else {
+                      downloadEducatorReceipt(educatorBillData || billData);
+                    }
+                  }}
+                  className="flex-1 py-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-500/40 flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-emerald-600/30"
+                >
+                  <FiDownload className="w-3.5 h-3.5" />
+                  <span>Download {activeReceiptTab === "student" ? "Student Invoice" : "Educator Voucher"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="py-3 px-4 rounded-xl text-xs font-bold bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <FiPrinter className="w-3.5 h-3.5" />
+                  <span>Print</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowBillModal(false)}
+                  className="flex-[1.5] py-3 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-lg shadow-amber-500/25 flex items-center justify-center gap-2 transition-all active:scale-95"
+                >
+                  <FiPlay className="w-3.5 h-3.5" />
+                  <span>Start Watching</span>
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

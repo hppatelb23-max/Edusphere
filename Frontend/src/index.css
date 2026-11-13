@@ -6,26 +6,32 @@
 @layer base {
     html {
       color-scheme: light dark;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+      min-height: 100% !important;
+      height: auto !important;
     }
-  }
-  
-  body {
-    transition: background-color 0.3s, color 0.3s;
-  }
-  /* Add custom animations */
-@layer utilities {
-    .animation-range {
-      animation-timeline: view() range(entry 0);
+    body {
+      transition: background-color 0.3s, color 0.3s;
+      overflow-x: hidden !important;
+      overflow-y: auto !important;
+      min-height: 100vh !important;
+      height: auto !important;
+      -webkit-overflow-scrolling: touch;
+    }
+    #root {
+      min-height: 100vh;
+      width: 100%;
+      overflow-y: visible;
     }
 }
-
+  
 /* Ensure MetaMask SDK modal / overlay is always centered in the middle in a medium-sized box */
 mm-select-modal,
 mm-install-modal,
 mm-pending-modal,
 #metamask-sdk-modal,
 [id*="metamask-sdk"],
-[id*="metamask"],
 .metamask-sdk-modal,
 div[class*="mm-modal"],
 div[data-testid="rk-connect-modal"] {

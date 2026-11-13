@@ -886,40 +886,86 @@ const EducatorMarks = () => {
               <div className="space-y-6 mb-6">
                 {selectedSubmission.detailed_review && selectedSubmission.detailed_review.length > 0 ? (
                   selectedSubmission.detailed_review.map((item, idx) => {
-                    const optionLetters = ["A", "B", "C", "D"];
-                    const isCorrect = item.is_correct;
+                    const optionLetters = ["A", "B", "C", "D", "E", "F"];
+                    const optionsList = Array.isArray(item.options) ? item.options : [];
+
+                    const resolveOptIdx = (val) => {
+                      if (val === undefined || val === null || val === -1 || val === "-1") return -1;
+                      if (typeof val === "number" && !isNaN(val)) return val;
+                      const str = String(val).trim();
+                      if (/^\d+$/.test(str)) return parseInt(str, 10);
+                      const letterMap = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, a: 0, b: 1, c: 2, d: 3, e: 4, f: 5 };
+                      if (letterMap[str] !== undefined) return letterMap[str];
+                      const found = optionsList.findIndex((o) => String(o).trim().toLowerCase() === str.toLowerCase());
+                      return found !== -1 ? found : -1;
+                    };
+
+                    const correctOptIdx = resolveOptIdx(item.correct_option);
+                    const selectedOptIdx = resolveOptIdx(item.selected_option);
+
+                    const isCorrect =
+                      correctOptIdx !== -1 && selectedOptIdx !== -1
+                        ? correctOptIdx === selectedOptIdx
+                        : Boolean(item.is_correct);
+
+                    const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : "None";
+                    const studentAnsText = selectedOptIdx !== -1 && optionsList[selectedOptIdx] ? optionsList[selectedOptIdx] : "";
+                    const correctOptLetter = correctOptIdx !== -1 ? optionLetters[correctOptIdx] : "A";
+                    const correctAnsText = correctOptIdx !== -1 && optionsList[correctOptIdx] ? optionsList[correctOptIdx] : "";
 
                     return (
                       <div
                         key={idx}
-                        className={`p-5 rounded-2xl border ${
+                        className={`p-5 rounded-2xl border transition-all ${
                           isCorrect
                             ? isDarkMode
-                              ? "bg-emerald-950/20 border-emerald-500/30"
-                              : "bg-emerald-50/60 border-emerald-200"
+                              ? "bg-emerald-950/20 border-emerald-500/40 shadow-sm"
+                              : "bg-emerald-50/70 border-emerald-300 shadow-sm"
                             : isDarkMode
-                            ? "bg-red-950/20 border-red-500/30"
-                            : "bg-red-50/60 border-red-200"
+                            ? "bg-red-950/25 border-red-500/40 shadow-sm"
+                            : "bg-red-50/70 border-red-300 shadow-sm"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-gray-400 uppercase">Question {idx + 1}</span>
                           <span
-                            className={`text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${
-                              isCorrect ? "text-emerald-400" : "text-red-400"
+                            className={`text-xs px-3 py-1 rounded-full font-extrabold flex items-center gap-1.5 border shadow-sm ${
+                              isCorrect
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
+                                : "bg-red-500/20 text-red-400 border-red-500/50"
                             }`}
                           >
                             {isCorrect ? (
                               <>
-                                <FiCheckCircle /> Correct
+                                <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>✓ Correct</span>
                               </>
                             ) : (
                               <>
-                                <FiXCircle /> Student Mistake
+                                <FiXCircle className="w-3.5 h-3.5 text-red-400" />
+                                <span>✗ Student Mistake</span>
                               </>
                             )}
                           </span>
                         </div>
+
+                        {/* Wrong Answer Warning Banner - Explaining candidate's mistake and highlighting correct solution */}
+                        {!isCorrect && (
+                          <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-2 text-red-300">
+                              <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                                ✗
+                              </span>
+                              <span>
+                                <strong>Candidate Choice:</strong> Option {studentOptLetter}{studentAnsText ? ` (${studentAnsText})` : ""} <span className="font-extrabold text-red-400">(Incorrect)</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 self-start sm:self-auto bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-extrabold shrink-0">
+                              <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Correct Solution: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}</span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Question Diagram / Image if present */}
                         {item.question_image && (
@@ -944,31 +990,38 @@ const EducatorMarks = () => {
                           </div>
                         )}
 
-                        <h4 className="text-sm font-bold mb-3">{item.question}</h4>
+                        <h4 className="text-sm font-bold mb-3 leading-snug">{item.question}</h4>
 
-                        {item.options && (
-                          <div className="space-y-1.5 mb-3 text-xs">
-                            {item.options.map((opt, optIdx) => {
-                              const isStudentSelected = item.selected_option === optIdx;
-                              const isCorrectOpt = item.correct_option === optIdx;
+                        {optionsList.length > 0 && (
+                          <div className="space-y-2 mb-3 text-xs">
+                            {optionsList.map((opt, optIdx) => {
+                              const isStudentSelected = selectedOptIdx === optIdx;
+                              const isCorrectOpt = correctOptIdx === optIdx;
                               const optImg = item.option_images && item.option_images[optIdx];
 
-                              let optClass = "border-gray-800 text-gray-400";
+                              let optClass = isDarkMode ? "border-gray-800 bg-gray-900/40 text-gray-300" : "border-gray-200 bg-white text-gray-800";
+                              let badgeColor = "bg-gray-800 text-gray-400 border border-gray-700";
+
                               if (isCorrectOpt) {
-                                optClass = "border-emerald-500 bg-emerald-500/15 text-emerald-300 font-bold";
+                                optClass = "border-2 border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold shadow-md shadow-emerald-500/10";
+                                badgeColor = "bg-emerald-500 text-black font-extrabold border-emerald-400";
                               } else if (isStudentSelected && !isCorrectOpt) {
-                                optClass = "border-red-500 bg-red-500/15 text-red-300 font-bold";
+                                optClass = "border-2 border-red-500 bg-red-500/20 text-red-300 font-bold shadow-md shadow-red-500/10";
+                                badgeColor = "bg-red-500 text-white font-extrabold border-red-400";
                               }
 
                               return (
                                 <div
                                   key={optIdx}
-                                  className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${optClass}`}
+                                  className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${optClass}`}
                                 >
-                                  <div className="flex items-center gap-2">
-                                    <span>
-                                      <strong>{optionLetters[optIdx]}:</strong> {opt}
+                                  <div className="flex items-center gap-2.5 flex-1">
+                                    <span
+                                      className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-extrabold shrink-0 shadow-sm ${badgeColor}`}
+                                    >
+                                      {optionLetters[optIdx]}
                                     </span>
+                                    <span className="font-medium text-xs sm:text-sm">{opt}</span>
                                   </div>
                                   {optImg && (
                                     <div
@@ -988,10 +1041,18 @@ const EducatorMarks = () => {
                                       </span>
                                     </div>
                                   )}
-                                  <div>
-                                    {isCorrectOpt && <span className="text-emerald-400">✓ Correct Solution</span>}
+                                  <div className="text-xs font-bold shrink-0">
+                                    {isCorrectOpt && (
+                                      <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-lg border border-emerald-500/40">
+                                        <FiCheckCircle className="w-3 h-3" />
+                                        <span>✓ Correct Solution {isStudentSelected ? "(Student's Choice)" : ""}</span>
+                                      </span>
+                                    )}
                                     {isStudentSelected && !isCorrectOpt && (
-                                      <span className="text-red-400">✗ Student's Answer</span>
+                                      <span className="inline-flex items-center gap-1 text-red-400 bg-red-950/60 px-2 py-0.5 rounded-lg border border-red-500/40">
+                                        <FiXCircle className="w-3 h-3" />
+                                        <span>✗ Student's Mistake</span>
+                                      </span>
                                     )}
                                   </div>
                                 </div>
@@ -1001,8 +1062,8 @@ const EducatorMarks = () => {
                         )}
 
                         {item.explanation && (
-                          <div className="p-3 rounded-xl bg-black/30 border border-gray-700/50 text-xs text-gray-300">
-                            <strong className="text-amber-400 block mb-0.5">Explanation Provided:</strong>
+                          <div className="p-3.5 rounded-xl bg-black/40 border border-gray-700/60 text-xs text-gray-300 leading-relaxed">
+                            <strong className="text-amber-400 block mb-1 font-bold">Solution & Explanation:</strong>
                             {item.explanation}
                           </div>
                         )}

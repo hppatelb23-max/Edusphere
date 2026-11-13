@@ -78,6 +78,7 @@ const TestTaking = () => {
   const recordedChunksRef = useRef([]);
   const proctorLogsRef = useRef([]);
   const lastWasCheatingRef = useRef(false);
+  const selectedAnswersRef = useRef({});
 
   // Load test details
   const loadTest = async () => {
@@ -377,35 +378,67 @@ const TestTaking = () => {
     setPhase("camera");
   };
 
-  // Select an option for current question
+  // Select an option for current question (stored by index, id, and question text for 100% reliability)
   const handleOptionSelect = (optionIndex) => {
-    const currentQ = questions[currentIndex];
-    const qKey = currentQ._id || currentQ.question;
-    setSelectedAnswers((prev) => ({
-      ...prev,
-      [qKey]: optionIndex
-    }));
+    const currentQ = questions[currentIndex] || {};
+    const qId = currentQ._id ? String(currentQ._id) : (currentQ.id ? String(currentQ.id) : "");
+    const qText = (currentQ.question || "").trim();
+
+    setSelectedAnswers((prev) => {
+      const next = {
+        ...prev,
+        [currentIndex]: optionIndex,
+        [String(currentIndex)]: optionIndex,
+        ...(qId ? { [qId]: optionIndex } : {}),
+        ...(qText ? { [qText]: optionIndex } : {}),
+        ...(currentQ.question ? { [currentQ.question]: optionIndex } : {})
+      };
+      selectedAnswersRef.current = next;
+      return next;
+    });
   };
 
   // Clear current question selection
   const handleClearSelection = () => {
-    const currentQ = questions[currentIndex];
-    const qKey = currentQ._id || currentQ.question;
+    const currentQ = questions[currentIndex] || {};
+    const qId = currentQ._id ? String(currentQ._id) : (currentQ.id ? String(currentQ.id) : "");
+    const qText = (currentQ.question || "").trim();
+
     setSelectedAnswers((prev) => {
       const copy = { ...prev };
-      delete copy[qKey];
+      delete copy[currentIndex];
+      delete copy[String(currentIndex)];
+      if (qId) delete copy[qId];
+      if (qText) delete copy[qText];
+      if (currentQ.question) delete copy[currentQ.question];
+      selectedAnswersRef.current = copy;
       return copy;
     });
   };
 
   // Toggle flag for review
   const handleToggleFlag = () => {
-    const currentQ = questions[currentIndex];
-    const qKey = currentQ._id || currentQ.question;
-    setFlaggedQuestions((prev) => ({
-      ...prev,
-      [qKey]: !prev[qKey]
-    }));
+    const currentQ = questions[currentIndex] || {};
+    const qId = currentQ._id ? String(currentQ._id) : (currentQ.id ? String(currentQ.id) : "");
+    const qText = (currentQ.question || "").trim();
+    const flagKey = currentIndex;
+
+    setFlaggedQuestions((prev) => {
+      const currentFlag = Boolean(
+        prev[flagKey] ||
+        prev[String(flagKey)] ||
+        (qId && prev[qId]) ||
+        (qText && prev[qText])
+      );
+      const nextFlag = !currentFlag;
+      return {
+        ...prev,
+        [flagKey]: nextFlag,
+        [String(flagKey)]: nextFlag,
+        ...(qId ? { [qId]: nextFlag } : {}),
+        ...(qText ? { [qText]: nextFlag } : {})
+      };
+    });
   };
 
   // Navigation
@@ -462,11 +495,46 @@ const TestTaking = () => {
         }
       }
 
-      const answersPayload = questions.map((q) => {
-        const qKey = q._id || q.question;
+      const liveAnswers = { ...selectedAnswers, ...(selectedAnswersRef.current || {}) };
+      const answersPayload = questions.map((q, idx) => {
+        const qId = q._id ? String(q._id) : (q.id ? String(q.id) : "");
+        const qText = (q.question || "").trim();
+
+        let selected = -1;
+        if (liveAnswers[idx] !== undefined) {
+          selected = liveAnswers[idx];
+        } else if (liveAnswers[String(idx)] !== undefined) {
+          selected = liveAnswers[String(idx)];
+        } else if (qId && liveAnswers[qId] !== undefined) {
+          selected = liveAnswers[qId];
+        } else if (qText && liveAnswers[qText] !== undefined) {
+          selected = liveAnswers[qText];
+        } else if (q.question && liveAnswers[q.question] !== undefined) {
+          selected = liveAnswers[q.question];
+        }
+
+        // Final fallback: look through all keys
+        if (selected === -1) {
+          for (const [k, v] of Object.entries(liveAnswers)) {
+            if (
+              String(k) === String(idx) ||
+              (qId && String(k) === qId) ||
+              (qText && String(k).trim().toLowerCase() === qText.toLowerCase())
+            ) {
+              selected = v;
+              break;
+            }
+          }
+        }
+
         return {
-          question_id: q._id || q.question,
-          selected_option: selectedAnswers[qKey] !== undefined ? selectedAnswers[qKey] : -1
+          question_id: q._id || q.question || `q_${idx}`,
+          question: q.question || "",
+          question_image: q.question_image || "",
+          options: q.options || [],
+          option_images: q.option_images || [],
+          selected_option: selected,
+          question_index: idx
         };
       });
 
@@ -503,6 +571,7 @@ const TestTaking = () => {
   // Retake test (re-pulls random questions from bank)
   const handleRetakeTest = async () => {
     setSelectedAnswers({});
+    selectedAnswersRef.current = {};
     setFlaggedQuestions({});
     setTabSwitchCount(0);
     setShowCheatingWarning(false);
@@ -530,13 +599,40 @@ const TestTaking = () => {
     return null;
   }
 
-  // Answer count calculation
+  // Answer count calculation (evaluated across all questions)
   const totalQuestions = questions.length;
-  const answeredCount = Object.keys(selectedAnswers).length;
+  const answeredCount = questions.reduce((acc, q, idx) => {
+    const qId = q._id ? String(q._id) : (q.id ? String(q.id) : "");
+    const qText = (q.question || "").trim();
+    const hasAnswer =
+      selectedAnswers[idx] !== undefined ||
+      selectedAnswers[String(idx)] !== undefined ||
+      (qId && selectedAnswers[qId] !== undefined) ||
+      (qText && selectedAnswers[qText] !== undefined) ||
+      (q.question && selectedAnswers[q.question] !== undefined);
+    return acc + (hasAnswer ? 1 : 0);
+  }, 0);
+
   const currentQ = questions[currentIndex] || {};
-  const currentQKey = currentQ._id || currentQ.question;
-  const currentSelectedOption = selectedAnswers[currentQKey];
-  const isCurrentFlagged = Boolean(flaggedQuestions[currentQKey]);
+  const currentQId = currentQ._id ? String(currentQ._id) : (currentQ.id ? String(currentQ.id) : "");
+  const currentQText = (currentQ.question || "").trim();
+  const currentSelectedOption =
+    selectedAnswers[currentIndex] !== undefined
+      ? selectedAnswers[currentIndex]
+      : (selectedAnswers[String(currentIndex)] !== undefined
+          ? selectedAnswers[String(currentIndex)]
+          : (currentQId && selectedAnswers[currentQId] !== undefined
+              ? selectedAnswers[currentQId]
+              : (currentQText && selectedAnswers[currentQText] !== undefined
+                  ? selectedAnswers[currentQText]
+                  : selectedAnswers[currentQ.question])));
+
+  const isCurrentFlagged = Boolean(
+    flaggedQuestions[currentIndex] ||
+    flaggedQuestions[String(currentIndex)] ||
+    (currentQId && flaggedQuestions[currentQId]) ||
+    (currentQText && flaggedQuestions[currentQText])
+  );
 
   // Timer warning status
   const isTimeCritical = timeLeft < 120; // < 2 mins
@@ -1191,9 +1287,21 @@ const TestTaking = () => {
               {/* Grid of question buttons */}
               <div className="grid grid-cols-5 gap-2.5 mb-6">
                 {questions.map((q, idx) => {
-                  const qKey = q._id || q.question;
-                  const isAnswered = selectedAnswers[qKey] !== undefined;
-                  const isFlagged = Boolean(flaggedQuestions[qKey]);
+                  const qId = q._id ? String(q._id) : (q.id ? String(q.id) : "");
+                  const qText = (q.question || "").trim();
+                  const isAnswered =
+                    selectedAnswers[idx] !== undefined ||
+                    selectedAnswers[String(idx)] !== undefined ||
+                    (qId && selectedAnswers[qId] !== undefined) ||
+                    (qText && selectedAnswers[qText] !== undefined) ||
+                    (q.question && selectedAnswers[q.question] !== undefined);
+
+                  const isFlagged = Boolean(
+                    flaggedQuestions[idx] ||
+                    flaggedQuestions[String(idx)] ||
+                    (qId && flaggedQuestions[qId]) ||
+                    (qText && flaggedQuestions[qText])
+                  );
                   const isCurrent = currentIndex === idx;
 
                   let btnStyle = isDarkMode
@@ -1344,20 +1452,47 @@ const TestTaking = () => {
               <div className="space-y-6">
                 {testResult.detailed_review &&
                   testResult.detailed_review.map((item, idx) => {
-                    const optionLetters = ["A", "B", "C", "D"];
-                    const isCorrect = item.is_correct;
+                    const optionLetters = ["A", "B", "C", "D", "E", "F"];
+                    const optionsList = Array.isArray(item.options) ? item.options : [];
+
+                    // Normalize indices reliably (supports numbers, numeric strings, letters, option text)
+                    const resolveOptIdx = (val) => {
+                      if (val === undefined || val === null || val === -1 || val === "-1") return -1;
+                      if (typeof val === "number" && !isNaN(val)) return val;
+                      const str = String(val).trim();
+                      if (/^\d+$/.test(str)) return parseInt(str, 10);
+                      const letterMap = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, a: 0, b: 1, c: 2, d: 3, e: 4, f: 5 };
+                      if (letterMap[str] !== undefined) return letterMap[str];
+                      const found = optionsList.findIndex((o) => String(o).trim().toLowerCase() === str.toLowerCase());
+                      return found !== -1 ? found : -1;
+                    };
+
+                    const correctOptIdx = resolveOptIdx(item.correct_option);
+                    const selectedOptIdx = resolveOptIdx(item.selected_option);
+
+                    // Re-evaluate correctness accurately
+                    const isCorrect =
+                      correctOptIdx !== -1 && selectedOptIdx !== -1
+                        ? correctOptIdx === selectedOptIdx
+                        : Boolean(item.is_correct);
+
+                    const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : "None";
+                    const studentAnsText = selectedOptIdx !== -1 && optionsList[selectedOptIdx] ? optionsList[selectedOptIdx] : "";
+                    const correctOptLetter = correctOptIdx !== -1 ? optionLetters[correctOptIdx] : "A";
+                    const correctAnsText = correctOptIdx !== -1 && optionsList[correctOptIdx] ? optionsList[correctOptIdx] : "";
 
                     return (
                       <div
                         key={idx}
-                        className={`rounded-2xl p-6 border transition-all ${isCorrect
+                        className={`rounded-2xl p-6 border transition-all ${
+                          isCorrect
                             ? isDarkMode
-                              ? "bg-emerald-950/20 border-emerald-500/30"
-                              : "bg-emerald-50/60 border-emerald-300"
+                              ? "bg-emerald-950/20 border-emerald-500/40 shadow-sm"
+                              : "bg-emerald-50/70 border-emerald-300 shadow-sm"
                             : isDarkMode
-                              ? "bg-red-950/20 border-red-500/30"
-                              : "bg-red-50/60 border-red-300"
-                          }`}
+                            ? "bg-red-950/25 border-red-500/40 shadow-sm"
+                            : "bg-red-50/70 border-red-300 shadow-sm"
+                        }`}
                       >
                         {/* Status bar */}
                         <div className="flex items-center justify-between mb-3">
@@ -1365,22 +1500,43 @@ const TestTaking = () => {
                             Question {idx + 1}
                           </span>
                           <span
-                            className={`text-xs px-2.5 py-1 rounded-full font-bold flex items-center gap-1 ${isCorrect
-                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                                : "bg-red-500/20 text-red-400 border border-red-500/40"
-                              }`}
+                            className={`text-xs px-3 py-1 rounded-full font-extrabold flex items-center gap-1.5 border shadow-sm ${
+                              isCorrect
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
+                                : "bg-red-500/20 text-red-400 border-red-500/50"
+                            }`}
                           >
                             {isCorrect ? (
                               <>
-                                <FiCheckCircle className="w-3.5 h-3.5" /> Correct
+                                <FiCheckCircle className="w-4 h-4 text-emerald-400" />
+                                <span>✓ Correct Answer</span>
                               </>
                             ) : (
                               <>
-                                <FiXCircle className="w-3.5 h-3.5" /> Incorrect
+                                <FiXCircle className="w-4 h-4 text-red-400" />
+                                <span>✗ Incorrect Answer</span>
                               </>
                             )}
                           </span>
                         </div>
+
+                        {/* Wrong Answer Explanation Banner - Explicitly reveals correct answer */}
+                        {!isCorrect && (
+                          <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-2 text-red-300">
+                              <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                                ✗
+                              </span>
+                              <span>
+                                <strong>Your Choice:</strong> Option {studentOptLetter}{studentAnsText ? ` (${studentAnsText})` : ""} <span className="font-extrabold text-red-400">(Incorrect)</span>
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 self-start sm:self-auto bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-extrabold shrink-0">
+                              <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Correct Answer: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}</span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Question Diagram / Image if present */}
                         {item.question_image && (
@@ -1405,73 +1561,80 @@ const TestTaking = () => {
                         )}
 
                         {/* Question text */}
-                        <h4 className="text-base font-bold mb-4">{item.question}</h4>
+                        <h4 className="text-base font-bold mb-4 leading-snug">{item.question}</h4>
 
                         {/* Options breakdown */}
-                        <div className="space-y-2 mb-4">
-                          {item.options &&
-                            item.options.map((opt, optIdx) => {
-                              const isStudentSelected = item.selected_option === optIdx;
-                              const isCorrectOpt = item.correct_option === optIdx;
-                              const optImg = item.option_images && item.option_images[optIdx];
+                        <div className="space-y-2.5 mb-4">
+                          {optionsList.map((opt, optIdx) => {
+                            const isStudentSelected = selectedOptIdx === optIdx;
+                            const isCorrectOpt = correctOptIdx === optIdx;
+                            const optImg = item.option_images && item.option_images[optIdx];
 
-                              let optBorder = isDarkMode ? "border-gray-800 bg-gray-900/40" : "border-gray-200 bg-white";
-                              let badgeColor = "bg-gray-800 text-gray-400";
+                            let optBorder = isDarkMode ? "border-gray-800 bg-gray-900/40 text-gray-300" : "border-gray-200 bg-white text-gray-800";
+                            let badgeColor = "bg-gray-800 text-gray-400 border border-gray-700";
 
-                              if (isCorrectOpt) {
-                                optBorder = "border-emerald-500 bg-emerald-500/15 text-emerald-300 font-semibold";
-                                badgeColor = "bg-emerald-500 text-black";
-                              } else if (isStudentSelected && !isCorrectOpt) {
-                                optBorder = "border-red-500 bg-red-500/15 text-red-300 font-semibold";
-                                badgeColor = "bg-red-500 text-white";
-                              }
+                            if (isCorrectOpt) {
+                              optBorder = "border-2 border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold shadow-md shadow-emerald-500/10";
+                              badgeColor = "bg-emerald-500 text-black font-extrabold border-emerald-400";
+                            } else if (isStudentSelected && !isCorrectOpt) {
+                              optBorder = "border-2 border-red-500 bg-red-500/20 text-red-300 font-bold shadow-md shadow-red-500/10";
+                              badgeColor = "bg-red-500 text-white font-extrabold border-red-400";
+                            }
 
-                              return (
-                                <div
-                                  key={optIdx}
-                                  className={`p-3 rounded-xl border text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${optBorder}`}
-                                >
-                                  <div className="flex items-center gap-3 flex-1">
-                                    <span
-                                      className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold ${badgeColor}`}
-                                    >
-                                      {optionLetters[optIdx]}
-                                    </span>
-                                    <span>{opt}</span>
-                                  </div>
-                                  {optImg && (
-                                    <div
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setZoomImage({
-                                          src: optImg,
-                                          alt: `Option ${optionLetters[optIdx]} diagram`
-                                        });
-                                      }}
-                                      className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 flex flex-col items-center shrink-0 cursor-zoom-in hover:border-amber-400"
-                                      title="Click to zoom option diagram"
-                                    >
-                                      <img src={optImg} alt={`Option ${optionLetters[optIdx]}`} className="max-h-16 object-contain" />
-                                      <span className="text-[9px] text-amber-400 mt-0.5 font-bold flex items-center gap-0.5">
-                                        <FiZoomIn className="w-2.5 h-2.5" /> Zoom
-                                      </span>
-                                    </div>
-                                  )}
-                                  <div className="text-xs font-semibold shrink-0">
-                                    {isCorrectOpt && <span className="text-emerald-400">✓ Correct Solution</span>}
-                                    {isStudentSelected && !isCorrectOpt && (
-                                      <span className="text-red-400">✗ Your Answer</span>
-                                    )}
-                                  </div>
+                            return (
+                              <div
+                                key={optIdx}
+                                className={`p-3.5 rounded-xl border text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${optBorder}`}
+                              >
+                                <div className="flex items-center gap-3 flex-1">
+                                  <span
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0 shadow-sm ${badgeColor}`}
+                                  >
+                                    {optionLetters[optIdx]}
+                                  </span>
+                                  <span className="font-medium text-sm leading-snug">{opt}</span>
                                 </div>
-                              );
-                            })}
+                                {optImg && (
+                                  <div
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setZoomImage({
+                                        src: optImg,
+                                        alt: `Option ${optionLetters[optIdx]} diagram`
+                                      });
+                                    }}
+                                    className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 flex flex-col items-center shrink-0 cursor-zoom-in hover:border-amber-400"
+                                    title="Click to zoom option diagram"
+                                  >
+                                    <img src={optImg} alt={`Option ${optionLetters[optIdx]}`} className="max-h-16 object-contain" />
+                                    <span className="text-[9px] text-amber-400 mt-0.5 font-bold flex items-center gap-0.5">
+                                      <FiZoomIn className="w-2.5 h-2.5" /> Zoom
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="text-xs font-bold shrink-0">
+                                  {isCorrectOpt && (
+                                    <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-500/40">
+                                      <FiCheckCircle className="w-3.5 h-3.5" />
+                                      <span>✓ Correct Solution {isStudentSelected ? "(Your Choice)" : ""}</span>
+                                    </span>
+                                  )}
+                                  {isStudentSelected && !isCorrectOpt && (
+                                    <span className="inline-flex items-center gap-1 text-red-400 bg-red-950/60 px-2.5 py-1 rounded-lg border border-red-500/40">
+                                      <FiXCircle className="w-3.5 h-3.5" />
+                                      <span>✗ Your Answer (Incorrect)</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
 
                         {/* Educator Explanation */}
                         {item.explanation && (
-                          <div className="p-4 rounded-xl bg-black/30 border border-gray-700/50 text-xs leading-relaxed">
-                            <strong className="text-amber-400 block mb-1">Educator's Solution & Explanation:</strong>
+                          <div className="p-4 rounded-xl bg-black/40 border border-gray-700/60 text-xs leading-relaxed">
+                            <strong className="text-amber-400 block mb-1 font-bold">Educator's Solution & Explanation:</strong>
                             <p className="text-gray-300">{item.explanation}</p>
                           </div>
                         )}

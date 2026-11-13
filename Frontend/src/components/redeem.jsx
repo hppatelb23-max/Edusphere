@@ -28,6 +28,7 @@ const RedeemPage = () => {
   const { address } = useAccount()
 
   const dropdownRef = useRef(null);
+  const isEducator = localStorage.getItem("role") === "educator";
 
   useEffect(() => {
     const fetchCoins = async () => {
@@ -179,7 +180,7 @@ const RedeemPage = () => {
         </div>
         <div className="flex items-center space-x-8">
           <div className="flex space-x-8">
-            <Link to="/studenthome" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to={isEducator ? "/educatorhome" : "/studenthome"} className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>

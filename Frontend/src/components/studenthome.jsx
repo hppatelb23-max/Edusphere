@@ -1,23 +1,71 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Link } from "react-router-dom";
-import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiAward } from "react-icons/fi";
+import { Link, useNavigate } from "react-router-dom";
+import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiAward, FiLogOut } from "react-icons/fi";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from "../context/WalletProvider";
 import { useThemeStore } from "../store/themeStore";
-import { useNavigate } from "react-router-dom"
+import { API_BASE_URL, getCookie } from "../utils/api";
+import axios from "axios";
+import { toast } from "react-toastify";
 
 const Studenthome = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { theme, setTheme } = useTheme();
 
-  const { walletAddress, walletConnected, connectWallet } = useWallet();
+  const { walletAddress, walletConnected, connectWallet, disconnectWallet } = useWallet();
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
   const dropdownRef = useRef(null);
 
   const navigate = useNavigate();
+
+  const [inrBalance, setInrBalance] = useState(() => {
+    const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
+    return saved ? Number(saved) : 1000;
+  });
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      try {
+        const token = getCookie("user");
+        const res = await axios.get(`${API_BASE_URL}/user/demo-upi-balance`, {
+          params: { wallet: walletAddress || "" },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const bal = res.data?.inr_balance ?? res.data?.demo_balance ?? 1000;
+        setInrBalance(bal);
+        localStorage.setItem("student_inr_cash", String(bal));
+        localStorage.setItem("demo_upi_cash", String(bal));
+      } catch (e) {}
+    };
+    fetchBalance();
+  }, [walletAddress]);
+
+  const handleAddMoney = async () => {
+    try {
+      const token = getCookie("user");
+      const res = await axios.post(`${API_BASE_URL}/user/demo-upi-add-cash`, {
+        amount: 500,
+        wallet: walletAddress || "",
+        name: localStorage.getItem("username") || ""
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      const newBal = res.data?.new_balance ?? (inrBalance + 500);
+      setInrBalance(newBal);
+      localStorage.setItem("student_inr_cash", String(newBal));
+      localStorage.setItem("demo_upi_cash", String(newBal));
+      toast.success(`🎉 Added ₹500! New Rupee Balance: ₹${newBal}`);
+    } catch (e) {
+      const newBal = inrBalance + 500;
+      setInrBalance(newBal);
+      localStorage.setItem("student_inr_cash", String(newBal));
+      localStorage.setItem("demo_upi_cash", String(newBal));
+      toast.success(`🎉 Added ₹500! New Rupee Balance: ₹${newBal}`);
+    }
+  };
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -52,6 +100,15 @@ const Studenthome = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    if (role === "educator") {
+      navigate("/educatorhome", { replace: true });
+    } else {
+      localStorage.setItem("role", "student");
+    }
+  }, [navigate]);
+
 
 
 
@@ -75,7 +132,7 @@ const Studenthome = () => {
         </div>
         <div className="flex items-center space-x-8">
           <div className="flex space-x-8">
-            <Link to="/" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/studenthome" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
@@ -91,6 +148,19 @@ const Studenthome = () => {
               Contest
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
+          </div>
+
+          {/* Student Indian Rupee Balance Badge */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Cash:</span>
+            <span className="font-black text-sm text-emerald-300">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+            <button
+              onClick={handleAddMoney}
+              title="Add ₹500 Indian Rupees"
+              className="px-2 py-0.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[10px] transition-all active:scale-95 shadow"
+            >
+              + ₹500
+            </button>
           </div>
 
           {/* Wallet Button */}
@@ -192,6 +262,13 @@ const Studenthome = () => {
                       <FiGift className="text-amber-500" />
                       <span>Redeem</span>
                     </Link>
+                    <button
+                      onClick={() => disconnectWallet()}
+                      className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-red-500/10 text-red-400 font-semibold transition-colors text-left"
+                    >
+                      <FiLogOut className="text-red-400" />
+                      <span>Disconnect Wallet</span>
+                    </button>
                   </div>
                 </motion.div>
               )}
@@ -225,7 +302,7 @@ const Studenthome = () => {
                 Explore Courses
               </Link>
               <Link to="/tests" className="bg-amber-500/20 border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black px-8 py-4 rounded-full text-lg font-semibold shadow-lg transition-all duration-300">
-                Take Tests
+                Give Tests
               </Link>
               <Link to="/howitworks" className="px-8 py-4 rounded-full border-2 border-amber-500 text-amber-500 hover:bg-amber-500/10 transition-colors duration-300 font-semibold">
                 How It Works

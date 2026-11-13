@@ -36,6 +36,26 @@ const CourseSchema = new mongoose.Schema({
         type: Number,
         required:true
     },
+    currency:
+    {
+        type: String,
+        default: "DUAL"
+    },
+    price_inr:
+    {
+        type: Number,
+        default: 0
+    },
+    price_eth:
+    {
+        type: Number,
+        default: 0
+    },
+    upi_id:
+    {
+        type: String,
+        default: "9969170089@upi"
+    },
     
     buy_count:
     {

@@ -2,7 +2,7 @@ import React, { useState, useEffect,useRef } from 'react';
 import { useNavigate, useLocation ,Link} from 'react-router-dom';
 // import Web3 from 'web3';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiChevronDown,FiCopy } from 'react-icons/fi';
+import { FiChevronDown,FiCopy, FiLogOut } from 'react-icons/fi';
 import { FiUser, FiDollarSign, FiBook, FiGift } from "react-icons/fi";
 // import { MdOutlineLibraryAdd, MdOutlineAccountBalance } from 'react-icons/md';
 // import { RiCoinsLine } from 'react-icons/ri';
@@ -33,7 +33,7 @@ const CoursesPage = () => {
   const navigate = useNavigate();
   const { state } = useLocation();
   const menuRef = useRef(null);
-  const { walletAddress, walletConnected, connectWallet } = useWallet();
+  const { walletAddress, walletConnected, connectWallet, disconnectWallet: providerDisconnect } = useWallet();
   const { theme, setTheme } = useTheme();
 
   const { writeContract, writeContractAsync } = useWriteContract()
@@ -100,6 +100,8 @@ const CoursesPage = () => {
   const disconnectWallet = () => {
     setAccount(null);
     setIsMenuOpen(false);
+    if (providerDisconnect) providerDisconnect();
+    else window.location.href = "/";
   };
   const toggleisDarkMode = () => setIsDarkMode(!isDarkMode);
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
@@ -373,12 +375,21 @@ const CoursesPage = () => {
                   </span>
                 )}
               </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-lg font-bold ${
-                    isDarkMode ? 'text-amber-400' : 'text-amber-600'
-                  }`}>
-                    Price : {course.course_price} ETH
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className={`text-base font-black block ${
+                      isDarkMode ? 'text-emerald-400' : 'text-emerald-600'
+                    }`}>
+                      ₹{course.price_inr && course.price_inr > 0
+                        ? course.price_inr
+                        : (course.course_price && course.course_price > 10
+                            ? course.course_price
+                            : Math.round(Number(course.course_price || 0.01) * 350000))} INR
+                    </span>
+                    <span className="text-[11px] text-gray-400 font-mono block">
+                      or {course.course_price && course.course_price < 5 ? course.course_price : 0.01} ETH
+                    </span>
+                  </div>
                 </div>
 
               <button

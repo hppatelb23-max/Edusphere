@@ -156,7 +156,7 @@ async function UploadCourse(req, res) {
         if (!req.user) {
             return res.status(401).json({ error: "Unauthorized Access" });
         }
-        const { title, description, price, category, image_hash, video_hash, author_wallet_id } = req.body;
+        const { title, description, price, category, image_hash, video_hash, author_wallet_id, currency, price_inr, price_eth, upi_id } = req.body;
         if (!title || !description || price === undefined || !image_hash || !video_hash) {
             return res.status(400).json({ error: "Please fill all fields." });
         }
@@ -168,6 +168,16 @@ async function UploadCourse(req, res) {
         if (!resolvedWallet) {
             return res.status(400).json({ error: "No MetaMask wallet found for this educator." });
         }
+
+        // Independent pricing for ETH and INR (separate fields without forced conversion)
+        const resolvedPriceInr = (price_inr !== undefined && price_inr !== null && price_inr !== "")
+            ? Number(price_inr)
+            : (currency === "INR" ? Number(price || 0) : 0);
+        const resolvedPriceEth = (price_eth !== undefined && price_eth !== null && price_eth !== "")
+            ? Number(price_eth)
+            : (currency === "ETH" ? Number(price || 0.05) : Number(price || 0.05));
+        const numericPrice = resolvedPriceEth > 0 ? resolvedPriceEth : (Number(price) || 0.05);
+        const chosenCurrency = currency || "DUAL";
 
         // Prevent duplicate creation of identical course
         const existingCourse = await Courses.findOne({
@@ -183,7 +193,11 @@ async function UploadCourse(req, res) {
                 category: Array.isArray(category) ? category : [category || "General"],
                 author_name: resolvedName,
                 author_wallet_id: resolvedWallet,
-                course_price: Number(price),
+                course_price: numericPrice,
+                currency: chosenCurrency,
+                price_inr: resolvedPriceInr,
+                price_eth: resolvedPriceEth,
+                upi_id: upi_id || "9969170089@upi",
                 course_image: image_hash,
                 course_video: Array.isArray(video_hash) ? video_hash : [video_hash]
             });

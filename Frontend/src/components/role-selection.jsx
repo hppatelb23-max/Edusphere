@@ -10,7 +10,7 @@ import { useThemeStore } from "../store/themeStore";
 
 const RoleSelection = () => {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
 
   const handleRoleSelection = (role) => {
     localStorage.setItem("role", role);
@@ -26,10 +26,10 @@ const RoleSelection = () => {
 
   return (
     <div
-      className={`flex flex-col justify-center items-center min-h-screen px-4 relative overflow-hidden ${
-        theme === "dark"
-          ? "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50"
-          : "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
+      className={`flex flex-col justify-center items-center min-h-screen px-4 relative overflow-hidden transition-colors duration-300 ${
+        isDarkMode
+          ? "bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white"
+          : "bg-gradient-to-br from-amber-50 via-orange-50 to-amber-50 text-gray-900"
       }`}
     >
       {/* Animated Background Elements */}
@@ -61,21 +61,19 @@ const RoleSelection = () => {
           Edusphere
         </h1>
        </motion.div>
-        <p className="mt-2 text-lg text-center text-amber-400 dark:text-gray-800 mb-8">
+        <p className={`mt-2 text-lg text-center mb-8 ${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
           Select your role to begin the transformative learning experience
         </p>
-      
 
       {/* Cards Container */}
       <div className="flex flex-wrap justify-center gap-12 mb-18 w-full max-w-6xl px-4 z-10">
         {/* Educator Card */}
         <motion.div
-  className={`w-96 p-8 rounded-3xl shadow-2xl backdrop-blur-lg ${
-    theme === "dark"
-      ? "bg-white/80 border border-amber-100"
-      : "bg-gray-800/90 border border-gray-600" // Increased background opacity
-  }`}
-
+          className={`w-96 p-8 rounded-3xl shadow-2xl backdrop-blur-lg ${
+            isDarkMode
+              ? "bg-gray-900/90 border border-gray-700 text-white"
+              : "bg-white/90 border border-amber-200 text-gray-900"
+          }`}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
@@ -95,28 +93,15 @@ const RoleSelection = () => {
                 className="absolute bottom-4 left-4 text-3xl text-amber-400"
               />
             </div>
-            <h2 className={`text-2xl font-bold mb-3 text-gray-800 dark:text-amber-100  ${
-                theme === "dark"
-                  ? " text-black hover:shadow-lg hover:shadow-amber-100"
-                  : " text-white hover:shadow-lg hover:shadow-amber-900/30"
-              }`} >
+            <h2 className={`text-2xl font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               Educator
             </h2>
-            <p className={`text-center mb-6 text-gray-600 dark:text-white  ${
-                theme === "dark"
-                  ? " text-black hover:shadow-lg hover:shadow-amber-100"
-                  : " text-slate-300 hover:shadow-lg hover:shadow-amber-900/30"
-              }`} >
+            <p className={`text-center mb-6 text-sm leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
               Empower learners with your expertise. Create, guide, and inspire in our
               decentralized educational ecosystem.
             </p>
             <motion.button
-              className={`w-full py-3 rounded-xl font-semibold transition-all ${
-                theme === "dark"
-                  ? "bg-gradient-to-r from-amber-500 to-orange-400 text-white hover:shadow-lg hover:shadow-amber-100"
-                  : "bg-gradient-to-r from-amber-500 to-orange-500 text-gray-900 hover:shadow-lg hover:shadow-amber-900/30"
-              }`}
-              // whileHover={{ scale: 1.02 }}
+              className="w-full py-3 rounded-xl font-semibold transition-all bg-gradient-to-r from-amber-500 to-orange-400 text-black hover:shadow-lg hover:shadow-amber-500/20"
               whileTap={{ scale: 0.98 }}
               onClick={() => handleRoleSelection("educator")}
             >
@@ -127,11 +112,11 @@ const RoleSelection = () => {
 
         {/* Student Card */}
         <motion.div
-  className={`w-96 p-8 rounded-3xl shadow-2xl backdrop-blur-lg ${
-    theme === "dark"
-      ? "bg-white/80 border border-amber-100"
-      : "bg-gray-800/90 border border-gray-600" // Increased background opacity
-  }`}
+          className={`w-96 p-8 rounded-3xl shadow-2xl backdrop-blur-lg ${
+            isDarkMode
+              ? "bg-gray-900/90 border border-gray-700 text-white"
+              : "bg-white/90 border border-amber-200 text-gray-900"
+          }`}
           variants={cardVariants}
           initial="hidden"
           animate="visible"
@@ -151,29 +136,16 @@ const RoleSelection = () => {
                 className="absolute bottom-4 left-4 text-3xl text-amber-400"
               />
             </div>
-            <h2 className={`text-2xl font-bold mb-3 text-gray-800 dark:text-amber-100  ${
-                theme === "dark"
-                  ? " text-black hover:shadow-lg hover:shadow-amber-100"
-                  : " text-white hover:shadow-lg hover:shadow-amber-900/30"
-              }`} >
+            <h2 className={`text-2xl font-bold mb-3 ${isDarkMode ? "text-white" : "text-gray-900"}`}>
               Student
             </h2>
-            <p className={`text-center mb-6 text-gray-600 dark:text-white  ${
-                theme === "dark"
-                  ? " text-black hover:shadow-lg "
-                  : " text-slate-300 hover:shadow-lg "
-              }`} >
+            <p className={`text-center mb-6 text-sm leading-relaxed ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
               Embark on your learning journey. Access verified courses, build your
               decentralized portfolio, and grow with peers.
             </p>
             <motion.button
-              className={`w-full py-3 rounded-xl font-semibold transition-all ${
-                theme === "dark"
-                  ? "bg-gradient-to-r from-amber-500 to-orange-400 text-white hover:shadow-lg hover:shadow-amber-100"
-                  : "bg-gradient-to-r from-amber-500 to-orange-500 text-gray-900 hover:shadow-lg hover:shadow-amber-900/30"
-              }`}
-              // whileHover={{ scale: 1.02 }}
-              // whileTap={{ scale: 0.98 }}
+              className="w-full py-3 rounded-xl font-semibold transition-all bg-gradient-to-r from-amber-500 to-orange-400 text-black hover:shadow-lg hover:shadow-amber-500/20"
+              whileTap={{ scale: 0.98 }}
               onClick={() => handleRoleSelection("student")}
             >
               Continue as Student

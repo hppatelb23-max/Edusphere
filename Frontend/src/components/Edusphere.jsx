@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { useTheme } from "next-themes";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion, useScroll, useTransform, AnimatePresence, useMotionValueEvent } from "framer-motion";
 import { useThemeStore } from "../store/themeStore";
 import { FaGithub, FaLinkedin, FaInstagram } from 'react-icons/fa';
@@ -43,9 +43,10 @@ const Edusphere = () => {
   const [navScroll, setNavScroll] = useState(false);
   const [selectedContact, setSelectedContact] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
   const { disconnectWallet } = useWallet();
 
-  // Whenever user arrives on the starting home screen, automatically disconnect the wallet
+  // Whenever user arrives directly at the starting home screen, automatically disconnect the wallet
   useEffect(() => {
     if (disconnectWallet) {
       disconnectWallet({ silent: true });
@@ -53,7 +54,7 @@ const Edusphere = () => {
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("walletConnected");
     }
-  }, []);
+  }, [location.pathname]);
 
   const handleStartLearning = (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -274,14 +275,6 @@ const Edusphere = () => {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
               </button>
 
-              <Link
-                to="/tests"
-                className={`group relative text-lg font-medium ${isDarkMode ? "text-white" : "text-gray-900"
-                  } hover:text-amber-300 transition-colors`}
-              >
-                Tests
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
-              </Link>
               <motion.button
                 whileHover={{ rotate: 15 }}
                 className="text-3xl p-2 rounded-full bg-opacity-20 backdrop-blur-sm"

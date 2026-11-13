@@ -25,6 +25,7 @@ const HowItWorks = () => {
   const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
   const { setTheme } = useTheme();
   const navigate = useNavigate();
+  const isEducator = localStorage.getItem("role") === "educator";
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -144,7 +145,7 @@ const HowItWorks = () => {
 
         <div className="flex items-center space-x-6">
           <div className="hidden md:flex space-x-8">
-            <Link to="/studenthome" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link to={isEducator ? "/educatorhome" : "/studenthome"} className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>

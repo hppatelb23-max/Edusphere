@@ -1,24 +1,46 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
-import { Link } from "react-router-dom";
-import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy } from "react-icons/fi";
+import { Link, useNavigate } from "react-router-dom";
+import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiLogOut } from "react-icons/fi";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useThemeStore } from "../store/themeStore";
 import { useWallet } from "../context/WalletProvider";
-import { useNavigate } from "react-router-dom";
+import { API_BASE_URL, getCookie } from "../utils/api";
+import axios from "axios";
 
 const Edusphere = () => {
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const { walletAddress, walletConnected, connectWallet } = useWallet();
+  const { walletAddress, walletConnected, connectWallet, disconnectWallet } = useWallet();
   const isDarkMode = useThemeStore((state) => state.isDarkMode);
   const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
 
   const dropdownRef = useRef(null);
 
   const navigate = useNavigate();
+
+  const [inrEarnings, setInrEarnings] = useState(() => {
+    const saved = localStorage.getItem("educator_inr_earnings");
+    return saved ? Number(saved) : 0;
+  });
+
+  useEffect(() => {
+    const fetchEarnings = async () => {
+      try {
+        const token = getCookie("admin");
+        const res = await axios.get(`${API_BASE_URL}/admin/inr-earnings`, {
+          params: { wallet: walletAddress || "" },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const amt = res.data?.inr_earnings ?? 0;
+        setInrEarnings(amt);
+        localStorage.setItem("educator_inr_earnings", String(amt));
+      } catch (e) {}
+    };
+    fetchEarnings();
+  }, [walletAddress]);
 
   const handleWalletClick = () => {
     console.log("Wallet Address:", walletAddress);
@@ -45,6 +67,15 @@ const Edusphere = () => {
       document.removeEventListener("click", handleClickOutside);
     };
   }, []);
+
+  useEffect(() => {
+    const role = localStorage.getItem("role");
+    if (role === "student") {
+      navigate("/studenthome", { replace: true });
+    } else {
+      localStorage.setItem("role", "educator");
+    }
+  }, [navigate]);
 
 
 
@@ -74,7 +105,7 @@ const Edusphere = () => {
         <div className="flex items-center space-x-8">
           <div className="flex space-x-8">
             <Link
-              to="/"
+              to="/educatorhome"
               className="group relative text-lg font-medium hover:text-amber-500 transition-colors"
             >
               Home
@@ -108,6 +139,12 @@ const Edusphere = () => {
               Test Facility
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
+          </div>
+
+          {/* Educator INR Revenue Badge */}
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Earnings:</span>
+            <span className="font-black text-sm text-emerald-300">₹{Number(inrEarnings).toLocaleString("en-IN")} INR</span>
           </div>
 
           {/* Wallet Button */}
@@ -203,7 +240,13 @@ const Edusphere = () => {
                       <FiBook className="text-amber-500" />
                       <span>Manage Courses</span>
                     </Link>
-
+                    <button
+                      onClick={() => disconnectWallet()}
+                      className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-red-500/10 text-red-400 font-semibold transition-colors text-left"
+                    >
+                      <FiLogOut className="text-red-400" />
+                      <span>Disconnect Wallet</span>
+                    </button>
                   </div>
                 </motion.div>
               )}

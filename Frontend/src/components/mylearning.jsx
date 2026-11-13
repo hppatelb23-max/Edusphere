@@ -94,25 +94,11 @@ const MyLearningPage = () => {
   }, []);
 
 
-  const handleAccountsChanged = (accounts) => {
-    if (accounts.length === 0) {
-      setAccount(null);
-    } else {
-      setAccount(accounts[0]);
-    }
-  };
-
-  const loadAccount = async () => {
-    if (window.ethereum && window.ethereum.selectedAddress) {
-      setAccount(window.ethereum.selectedAddress);
-    }
-  };
-
-
+  const isEducator = localStorage.getItem("role") === "educator";
 
   const disconnectWallet = () => {
-    setAccount(null);
     setIsMenuOpen(false);
+    window.location.href = "/";
   };
   const toggleDarkMode = () => setDarkMode(!darkMode);
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
@@ -208,7 +194,7 @@ const MyLearningPage = () => {
         <div className="flex items-center space-x-8">
           <div className="flex space-x-8">
             <Link
-              to="/studenthome"
+              to={isEducator ? "/educatorhome" : "/studenthome"}
               className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
             >
               Home

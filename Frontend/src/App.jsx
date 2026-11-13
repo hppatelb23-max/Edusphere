@@ -29,6 +29,7 @@ import TestTaking from './components/tests/TestTaking.jsx';
 import CreateTest from './components/tests/CreateTest.jsx';
 import EducatorMarks from './components/tests/EducatorMarks.jsx';
 import MyTestMarks from './components/tests/MyTestMarks.jsx';
+import AdminPayments from './components/AdminPayments.jsx';
 
 
 const ProtectedRoute = ({ element }) => {
@@ -41,7 +42,7 @@ const queryClient = new QueryClient()
 const App = () => {
   return (
     <>
-      <WagmiProvider config={config}>
+      <WagmiProvider config={config} reconnectOnMount={false}>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
             <CourseProvider>
@@ -67,6 +68,8 @@ const App = () => {
                   <Route path="/coursedetails" element={<ProtectedRoute element={<CourseDetailsPage />} />} />
                   <Route path="/createcourses" element={<ProtectedRoute element={<CreateCourse />} />} />
                   <Route path="/managecourses" element={<ProtectedRoute element={<Managecourse />} />} />
+                  <Route path="/admin-payments" element={<ProtectedRoute element={<AdminPayments />} />} />
+                  <Route path="/admin/payments" element={<ProtectedRoute element={<AdminPayments />} />} />
                   <Route path="/redeem" element={<ProtectedRoute element={<Redeem />} />} />
                   <Route path="/transaction" element={<ProtectedRoute element={<Transaction />} />} />
                   <Route path="/contest" element={<ProtectedRoute element={<Contest />} />} />

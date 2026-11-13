@@ -153,7 +153,7 @@ const MyTestMarks = () => {
       <div className="flex items-center space-x-6">
         <div className="hidden md:flex space-x-8">
           <Link
-            to="/studenthome"
+            to={userRole === "educator" ? "/educatorhome" : "/studenthome"}
             className="group relative text-lg font-medium hover:text-amber-400 transition-colors"
           >
             Home
@@ -618,28 +618,44 @@ const MyTestMarks = () => {
                               </div>
                             ) : (
                               displayedItems.map((item, qIdx) => {
-                                const optLetters = ["A", "B", "C", "D"];
-                                const correct = item.is_correct;
-                                const studentOptLetter =
-                                  item.selected_option !== undefined && item.selected_option !== null
-                                    ? optLetters[item.selected_option]
-                                    : "None";
-                                const correctOptLetter =
-                                  item.correct_option !== undefined && item.correct_option !== null
-                                    ? optLetters[item.correct_option]
-                                    : "?";
+                                const optionLetters = ["A", "B", "C", "D", "E", "F"];
+                                const optionsList = Array.isArray(item.options) ? item.options : [];
+
+                                const resolveOptIdx = (val) => {
+                                  if (val === undefined || val === null || val === -1 || val === "-1") return -1;
+                                  if (typeof val === "number" && !isNaN(val)) return val;
+                                  const str = String(val).trim();
+                                  if (/^\d+$/.test(str)) return parseInt(str, 10);
+                                  const letterMap = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5, a: 0, b: 1, c: 2, d: 3, e: 4, f: 5 };
+                                  if (letterMap[str] !== undefined) return letterMap[str];
+                                  const found = optionsList.findIndex((o) => String(o).trim().toLowerCase() === str.toLowerCase());
+                                  return found !== -1 ? found : -1;
+                                };
+
+                                const correctOptIdx = resolveOptIdx(item.correct_option);
+                                const selectedOptIdx = resolveOptIdx(item.selected_option);
+
+                                const isCorrect =
+                                  correctOptIdx !== -1 && selectedOptIdx !== -1
+                                    ? correctOptIdx === selectedOptIdx
+                                    : Boolean(item.is_correct);
+
+                                const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : "None";
+                                const studentAnsText = selectedOptIdx !== -1 && optionsList[selectedOptIdx] ? optionsList[selectedOptIdx] : "";
+                                const correctOptLetter = correctOptIdx !== -1 ? optionLetters[correctOptIdx] : "A";
+                                const correctAnsText = correctOptIdx !== -1 && optionsList[correctOptIdx] ? optionsList[correctOptIdx] : "";
 
                                 return (
                                   <div
                                     key={qIdx}
                                     className={`rounded-2xl p-5 border text-sm transition-all ${
-                                      correct
+                                      isCorrect
                                         ? isDarkMode
-                                          ? "bg-emerald-950/20 border-emerald-500/25"
-                                          : "bg-emerald-50/60 border-emerald-200"
+                                          ? "bg-emerald-950/20 border-emerald-500/40 shadow-sm"
+                                          : "bg-emerald-50/70 border-emerald-300 shadow-sm"
                                         : isDarkMode
-                                        ? "bg-red-950/25 border-red-500/35"
-                                        : "bg-red-50/70 border-red-300"
+                                        ? "bg-red-950/25 border-red-500/40 shadow-sm"
+                                        : "bg-red-50/70 border-red-300 shadow-sm"
                                     }`}
                                   >
                                     {/* Question header */}
@@ -648,25 +664,41 @@ const MyTestMarks = () => {
                                         Question {qIdx + 1}
                                       </span>
                                       <span
-                                        className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
-                                          correct
-                                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                                            : "bg-red-500/20 border-red-500/40 text-red-400"
+                                        className={`text-xs px-3 py-1 rounded-full font-extrabold border flex items-center gap-1.5 shadow-sm ${
+                                          isCorrect
+                                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
+                                            : "bg-red-500/20 border-red-500/50 text-red-400"
                                         }`}
                                       >
-                                        {correct ? "✓ Correct Solution" : "✗ Incorrect Answer"}
+                                        {isCorrect ? (
+                                          <>
+                                            <FiCheckCircle className="w-3.5 h-3.5" />
+                                            <span>✓ Correct Solution</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <FiXCircle className="w-3.5 h-3.5" />
+                                            <span>✗ Incorrect Answer</span>
+                                          </>
+                                        )}
                                       </span>
                                     </div>
 
                                     {/* Wrong Answer Warning Banner */}
-                                    {!correct && (
-                                      <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/40 text-xs text-red-300 mb-4 flex items-center justify-between gap-2">
-                                        <span>
-                                          <strong>Your Choice:</strong> Option {studentOptLetter} (Incorrect)
-                                        </span>
-                                        <span className="text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30">
-                                          Correct: Option {correctOptLetter}
-                                        </span>
+                                    {!isCorrect && (
+                                      <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                                        <div className="flex items-center gap-2 text-red-300">
+                                          <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                                            ✗
+                                          </span>
+                                          <span>
+                                            <strong>Your Choice:</strong> Option {studentOptLetter}{studentAnsText ? ` (${studentAnsText})` : ""} <span className="font-extrabold text-red-400">(Incorrect)</span>
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 self-start sm:self-auto bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-extrabold shrink-0">
+                                          <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                          <span>Correct Answer: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}</span>
+                                        </div>
                                       </div>
                                     )}
 
@@ -697,74 +729,75 @@ const MyTestMarks = () => {
                                     </p>
 
                                     {/* MCQ Options List */}
-                                    <div className="space-y-2 mb-4">
-                                      {item.options &&
-                                        item.options.map((opt, oIdx) => {
-                                          const isYours = item.selected_option === oIdx;
-                                          const isCorrectOpt = item.correct_option === oIdx;
-                                          const optImg = item.option_images && item.option_images[oIdx];
+                                    <div className="space-y-2.5 mb-4">
+                                      {optionsList.map((opt, oIdx) => {
+                                        const isYours = selectedOptIdx === oIdx;
+                                        const isCorrectOpt = correctOptIdx === oIdx;
+                                        const optImg = item.option_images && item.option_images[oIdx];
 
-                                          let cls = isDarkMode
-                                            ? "border-gray-700 bg-gray-900/40"
-                                            : "border-gray-200 bg-white";
-                                          let badge = "bg-gray-700 text-gray-400";
+                                        let cls = isDarkMode
+                                          ? "border-gray-800 bg-gray-900/40 text-gray-300"
+                                          : "border-gray-200 bg-white text-gray-800";
+                                        let badge = "bg-gray-800 text-gray-400 border border-gray-700";
 
-                                          if (isCorrectOpt) {
-                                            cls =
-                                              "border-emerald-500 bg-emerald-500/15 text-emerald-300 font-semibold shadow-sm";
-                                            badge = "bg-emerald-500 text-black";
-                                          } else if (isYours && !isCorrectOpt) {
-                                            cls =
-                                              "border-red-500 bg-red-500/15 text-red-300 font-semibold shadow-sm";
-                                            badge = "bg-red-500 text-white";
-                                          }
+                                        if (isCorrectOpt) {
+                                          cls =
+                                            "border-2 border-emerald-500 bg-emerald-500/20 text-emerald-300 font-bold shadow-md shadow-emerald-500/10";
+                                          badge = "bg-emerald-500 text-black font-extrabold border-emerald-400";
+                                        } else if (isYours && !isCorrectOpt) {
+                                          cls =
+                                            "border-2 border-red-500 bg-red-500/20 text-red-300 font-bold shadow-md shadow-red-500/10";
+                                          badge = "bg-red-500 text-white font-extrabold border-red-400";
+                                        }
 
-                                          return (
-                                            <div
-                                              key={oIdx}
-                                              className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${cls}`}
-                                            >
-                                              <div className="flex items-center gap-3 flex-1">
-                                                <span
-                                                  className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold shrink-0 ${badge}`}
-                                                >
-                                                  {optLetters[oIdx]}
-                                                </span>
-                                                <span className="text-sm">{opt}</span>
-                                              </div>
-                                              {optImg && (
-                                                <div
-                                                  onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setZoomImage({
-                                                      src: optImg,
-                                                      alt: `Option ${optLetters[oIdx]} diagram`
-                                                    });
-                                                  }}
-                                                  className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 flex flex-col items-center shrink-0 cursor-zoom-in hover:border-amber-400"
-                                                  title="Click to zoom option diagram"
-                                                >
-                                                  <img src={optImg} alt={`Option ${optLetters[oIdx]}`} className="max-h-16 object-contain" />
-                                                  <span className="text-[9px] text-amber-400 mt-0.5 font-bold flex items-center gap-0.5">
-                                                    <FiZoomIn className="w-2.5 h-2.5" /> Zoom
-                                                  </span>
-                                                </div>
-                                              )}
-                                              <span className="text-xs font-bold shrink-0">
-                                                {isCorrectOpt && (
-                                                  <span className="text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
-                                                    ✓ Correct Solution
-                                                  </span>
-                                                )}
-                                                {isYours && !isCorrectOpt && (
-                                                  <span className="text-red-400 bg-red-500/15 px-2 py-0.5 rounded border border-red-500/30">
-                                                    ✗ Your Selected Answer
-                                                  </span>
-                                                )}
+                                        return (
+                                          <div
+                                            key={oIdx}
+                                            className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${cls}`}
+                                          >
+                                            <div className="flex items-center gap-3 flex-1">
+                                              <span
+                                                className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-extrabold shrink-0 shadow-sm ${badge}`}
+                                              >
+                                                {optionLetters[oIdx]}
                                               </span>
+                                              <span className="text-sm font-medium leading-snug">{opt}</span>
                                             </div>
-                                          );
-                                        })}
+                                            {optImg && (
+                                              <div
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setZoomImage({
+                                                    src: optImg,
+                                                    alt: `Option ${optionLetters[oIdx]} diagram`
+                                                  });
+                                                }}
+                                                className="rounded-lg overflow-hidden border border-gray-700 bg-black/30 p-1 flex flex-col items-center shrink-0 cursor-zoom-in hover:border-amber-400"
+                                                title="Click to zoom option diagram"
+                                              >
+                                                <img src={optImg} alt={`Option ${optionLetters[oIdx]}`} className="max-h-16 object-contain" />
+                                                <span className="text-[9px] text-amber-400 mt-0.5 font-bold flex items-center gap-0.5">
+                                                  <FiZoomIn className="w-2.5 h-2.5" /> Zoom
+                                                </span>
+                                              </div>
+                                            )}
+                                            <span className="text-xs font-bold shrink-0">
+                                              {isCorrectOpt && (
+                                                <span className="inline-flex items-center gap-1 text-emerald-400 bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-500/40">
+                                                  <FiCheckCircle className="w-3.5 h-3.5" />
+                                                  <span>✓ Correct Solution {isYours ? "(Your Choice)" : ""}</span>
+                                                </span>
+                                              )}
+                                              {isYours && !isCorrectOpt && (
+                                                <span className="inline-flex items-center gap-1 text-red-400 bg-red-950/60 px-2.5 py-1 rounded-lg border border-red-500/40">
+                                                  <FiXCircle className="w-3.5 h-3.5" />
+                                                  <span>✗ Your Choice (Incorrect)</span>
+                                                </span>
+                                              )}
+                                            </span>
+                                          </div>
+                                        );
+                                      })}
                                     </div>
 
                                     {/* Solution explanation */}

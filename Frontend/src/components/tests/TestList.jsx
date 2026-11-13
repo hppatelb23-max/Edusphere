@@ -125,7 +125,7 @@ const TestList = () => {
 
   return (
     <div
-      className={`min-h-screen ${
+      className={`min-h-screen w-full overflow-y-auto overflow-x-hidden ${
         isDarkMode
           ? "bg-gradient-to-br from-black via-gray-900 to-gray-800 text-gray-100"
           : "bg-gradient-to-br from-amber-50 via-white to-yellow-50 text-gray-900"
@@ -146,7 +146,7 @@ const TestList = () => {
 
         <div className="flex items-center space-x-6">
           <div className="hidden md:flex space-x-8">
-            <Link to="/studenthome" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link to={isEducator ? "/educatorhome" : "/studenthome"} className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
@@ -530,7 +530,7 @@ const TestList = () => {
                         className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                       >
                         <FiCheckCircle className="w-4 h-4" />
-                        <span>Take Assessment</span>
+                        <span>Give Test</span>
                       </button>
                     )}
 

@@ -28,7 +28,8 @@ const CreateCourse = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    pricing: '',
+    price_inr: '',
+    price_eth: '',
     category: ''
   });
   const { writeContract, writeContractAsync } = useWriteContract()
@@ -179,8 +180,12 @@ const CreateCourse = () => {
       toast.warn('Please enter a course description.');
       return;
     }
-    if (!formData.pricing || Number(formData.pricing) <= 0) {
-      toast.warn('Please enter a valid course price.');
+    if (formData.price_inr === '' || isNaN(Number(formData.price_inr)) || Number(formData.price_inr) < 0) {
+      toast.warn('Please enter a valid price in Indian Rupees (₹ INR).');
+      return;
+    }
+    if (formData.price_eth === '' || isNaN(Number(formData.price_eth)) || Number(formData.price_eth) < 0) {
+      toast.warn('Please enter a valid price in Ethereum (ETH).');
       return;
     }
     if (!imageFile) {
@@ -217,10 +222,18 @@ const CreateCourse = () => {
         ? formData.category.split(',').map((c) => c.trim()).filter(Boolean)
         : (Array.isArray(formData.category) ? formData.category : []);
 
+      const priceInr = Number(formData.price_inr) || 0;
+      const priceEth = Number(formData.price_eth) || 0;
+
       const courseData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
-        price: Number(formData.pricing),
+        price: priceEth > 0 ? priceEth : priceInr,
+        course_price: priceEth > 0 ? priceEth : 0.05,
+        currency: 'DUAL',
+        price_inr: priceInr,
+        price_eth: priceEth,
+        upi_id: '9969170089@upi',
         category: categoryList.length > 0 ? categoryList : ['General'],
         image_hash: uploadedFiles.image,
         video_hash: uploadedFiles.videos,
@@ -281,7 +294,8 @@ const CreateCourse = () => {
         setFormData({
           title: '',
           description: '',
-          pricing: '',
+          price_inr: '',
+          price_eth: '',
           category: ''
         });
         setImageFile(null);
@@ -564,24 +578,70 @@ const CreateCourse = () => {
                 </div>
               </div>
 
-              {/*  Price Field */}
-              <div className="relative">
-                <label className="block text-sm font-medium mb-2">
-                  Pricing
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    id="pricing"
-                    name="pricing"
-                    value={formData.pricing}
-                    onChange={handleInputChange}
-                    className="w-full pl-12 pr-4 py-3 bg-transparent border dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none transition-all"
-                    placeholder="eg 0.1 ETH"
-                  />
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-amber-400 rounded-full flex items-center justify-center">
-                      <span className="text-xs font-bold text-white">EDU</span>
+              {/*  Independent Pricing Fields: Indian Rupees & Ethereum (Separate & Distinct) */}
+              <div className="p-4 rounded-xl border border-gray-700/80 bg-gray-900/40 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-bold text-gray-200">
+                    Course Pricing (Set Separately for Both Payment Options)
+                  </label>
+                  <span className="text-[11px] text-amber-400 font-semibold">Separate Rates</span>
+                </div>
+                <p className="text-xs text-gray-400">
+                  Set independent custom prices for real-money UPI and Ethereum. Students can purchase using whichever method they prefer.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  {/* Indian Rupees Price Input */}
+                  <div className="relative">
+                    <label className="block text-xs font-semibold text-emerald-400 mb-1.5">
+                      🇮🇳 Price in Indian Rupees (₹ INR)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        id="price_inr"
+                        name="price_inr"
+                        value={formData.price_inr}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-4 py-3 bg-transparent border dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition-all font-mono text-sm"
+                        placeholder="e.g. 500 or 1"
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                        <span className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-black text-xs">
+                          ₹
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-gray-400 block mt-1">
+                      Exact fee for students paying via UPI QR (Minimum legal UPI bank transfer in India is ₹1.00)
+                    </span>
+                  </div>
+
+                  {/* Ethereum Price Input */}
+                  <div className="relative">
+                    <label className="block text-xs font-semibold text-amber-400 mb-1.5">
+                      ⟠ Price in Ethereum (ETH)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        id="price_eth"
+                        name="price_eth"
+                        value={formData.price_eth}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-4 py-3 bg-transparent border dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-amber-400 outline-none transition-all font-mono text-sm"
+                        placeholder="e.g. 0.05 or 0.01"
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                        <span className="w-5 h-5 bg-amber-400 rounded-full flex items-center justify-center font-bold text-black text-xs">
+                          Ξ
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-gray-400 block mt-1">
+                      Exact fee for students paying with Web3 / MetaMask
                     </span>
                   </div>
                 </div>
