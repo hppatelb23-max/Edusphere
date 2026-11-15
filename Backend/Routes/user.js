@@ -2,6 +2,7 @@ const express = require('express')
 const {
     VerifyUser,
     CreateUser,
+    GetAccountLockedName,
     DisplayMyLearning,
     DisplayTransactionHistory,
     DisplayEducatorTransactions,
@@ -26,8 +27,9 @@ const user_router = express.Router()
 
 user_router.post('/login', VerifyUser)
 user_router.post('/add-details', CreateUser)
-user_router.get("/my-learning", allow_login_user, DisplayMyLearning)
-user_router.get("/transaction-history", allow_login_user, DisplayTransactionHistory)
+user_router.get('/account-locked-name', GetAccountLockedName)
+user_router.get("/my-learning", optional_login_user, DisplayMyLearning)
+user_router.get("/transaction-history", optional_login_user, DisplayTransactionHistory)
 user_router.get("/educator-transactions", optional_login_user, DisplayEducatorTransactions)
 user_router.get("/check-upi-payment", optional_login_user, CheckUpiPaymentStatus)
 user_router.post("/purchase-course", optional_login_user, PurchaseCourse)

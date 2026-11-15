@@ -43,7 +43,80 @@ import { contractAbi, contractAddress } from "../utils/constants";
 import { useWriteContract } from "wagmi";
 import { toast } from "react-toastify";
 import { API_BASE_URL, getCookie } from "../utils/api";
+import ThreeLineMenu from "./ThreeLineMenu";
 import { ethers } from "ethers";
+
+
+// Dynamically synchronized speech captions based on video lecture audio context and playback time
+const getSpeechCaption = (courseTitle = "", videoTitle = "", timeInSec = 0) => {
+  const combined = (courseTitle + " " + videoTitle).toLowerCase();
+  let track = [];
+
+  if (combined.includes("python") || combined.includes("data") || combined.includes("ai") || combined.includes("ml")) {
+    track = [
+      "Welcome everyone! In this Python lecture, we explore the core syntax and data structures.",
+      "Setting up our interactive Python environment and importing required dependencies.",
+      "Notice how variables are dynamically typed and efficiently assigned in memory.",
+      "Let's structure our function with clear parameters, return types, and documentation.",
+      "Here we apply list comprehensions and lambda expressions for cleaner functional logic.",
+      "Always handle potential exceptions gracefully using structured try-except blocks.",
+      "Let's inspect the runtime output in our console to verify that the logic holds.",
+      "Integrating our data processing pipeline with NumPy and Pandas for rapid analysis.",
+      "Notice the algorithmic time complexity and how vectorization dramatically speeds up execution.",
+      "This modular pattern ensures our codebase remains clean, reusable, and easy to test.",
+      "Let's run a quick unit test suite to validate our functions before proceeding.",
+      "In the next video, we will deploy this script into an automated cloud workflow."
+    ];
+  } else if (combined.includes("blockchain") || combined.includes("web3") || combined.includes("solidity") || combined.includes("crypto") || combined.includes("eth")) {
+    track = [
+      "Welcome! In this Web3 session, we dive deep into smart contracts and blockchain logic.",
+      "Ensure your MetaMask wallet is connected and funded with testnet Ethereum.",
+      "Here is the smart contract layout: state variables, events, and custom function modifiers.",
+      "Notice how gas optimization techniques minimize transaction execution fees on-chain.",
+      "We implement strict access controls using OpenZeppelin standards to secure our contract.",
+      "Always safeguard against re-entrancy attacks and integer overflow vulnerabilities.",
+      "Emitting index events allows our decentralized application front-end to react to state changes.",
+      "Let's simulate contract deployment and test method execution via ethers.js in real time.",
+      "Checking the cryptographic transaction receipt and block confirmations on the ledger.",
+      "Decentralized consensus guarantees that this transaction is tamper-proof and immutable.",
+      "Now let's interact with our deployed smart contract directly through the React interface.",
+      "In the next video, we will verify the contract source code on Etherscan."
+    ];
+  } else if (combined.includes("react") || combined.includes("javascript") || combined.includes("frontend") || combined.includes("web")) {
+    track = [
+      "Welcome to this lesson! Today we build responsive React components and manage state.",
+      "Notice how React's virtual DOM diffing engine efficiently updates rendered elements.",
+      "Here we declare useState and useEffect hooks to handle asynchronous lifecycle events.",
+      "Passing structured props down our component tree while preserving unidirectional data flow.",
+      "Handling user interactions and form submissions with seamless input validation.",
+      "Asynchronous API calls fetch real-time updates directly from our backend server.",
+      "Applying Tailwind CSS utility classes to achieve a polished, responsive user interface.",
+      "Memoizing expensive calculations with useMemo to prevent unnecessary component re-renders.",
+      "Implementing robust error boundaries to guarantee that the UI never crashes unexpectedly.",
+      "Let's open React DevTools to inspect our state hierarchy and verify prop updates.",
+      "Notice how clean separation of concerns makes testing our components effortless.",
+      "In the next module, we will connect this component to our global state store."
+    ];
+  } else {
+    track = [
+      "Welcome to this lecture! Today we cover essential concepts and hands-on fundamentals.",
+      "Let's walk through the project setup and ensure all tools are configured properly.",
+      "Notice how core foundational principles guide this entire step-by-step implementation.",
+      "Here we break down the complex architecture into small, manageable modules.",
+      "Pay close attention to how user inputs are validated, processed, and transformed.",
+      "Applying industry best practices guarantees robust, secure, and reliable outcomes.",
+      "Let's run a test execution in the console to verify that our output behaves as expected.",
+      "Notice the performance benefits of optimizing this critical execution pathway.",
+      "Handling edge cases properly ensures that our application remains resilient in production.",
+      "Reviewing the key takeaways before connecting this logic to our next learning module.",
+      "Take a moment to practice this example in your local code editor before moving on.",
+      "In our next lesson, we will build upon these techniques with advanced practical exercises."
+    ];
+  }
+
+  const step = Math.floor(Math.max(0, timeInSec) / 5) % track.length;
+  return track[step];
+};
 
 const CourseDetails = () => {
   const { id } = useParams();
@@ -64,6 +137,28 @@ const CourseDetails = () => {
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
 
+  // Navbar / Theme / Wallet
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { walletAddress, walletConnected, connectWallet } = useWallet();
+  const isDarkMode = useThemeStore((state) => state.isDarkMode);
+  const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
+  const { setTheme } = useTheme();
+  const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+
+  const { writeContractAsync } = useWriteContract();
+
+  // Role detection
+  const userRole = localStorage.getItem("role") || "student";
+  const educatorWallet = course?.author_wallet_id;
+  const currentWallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem("educatorWallet") || "";
+  const currentName = localStorage.getItem("username") || localStorage.getItem("educatorName") || "";
+  const isAuthor = Boolean(
+    (educatorWallet && currentWallet && educatorWallet.toLowerCase() === currentWallet.toLowerCase()) ||
+    (course?.author_name && currentName && course.author_name.toLowerCase().trim() === currentName.toLowerCase().trim())
+  );
+  const isEducator = userRole === "educator";
+
   // Purchasing & Enrollment State
   const [isPurchased, setIsPurchased] = useState(false);
   const [isBuying, setIsBuying] = useState(false);
@@ -79,14 +174,51 @@ const CourseDetails = () => {
   const [paymentStep, setPaymentStep] = useState("selection"); // "selection" | "processing" | "success"
   const [countdown, setCountdown] = useState(300);
   const [demoUpiCash, setDemoUpiCash] = useState(() => {
+    const role = localStorage.getItem("role");
+    const isEdu = role === "educator" || Boolean(getCookie("admin"));
+    if (isEdu) {
+      const savedEducator = localStorage.getItem("educator_inr_balance") || localStorage.getItem("educator_inr_earnings");
+      if (savedEducator !== null && savedEducator !== undefined) {
+        return Number(savedEducator);
+      }
+    }
     const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
-    return saved ? Number(saved) : 1000;
+    if (!saved || saved === "1000") {
+      return 0;
+    }
+    return Number(saved);
   });
+
+  useEffect(() => {
+    const handleBalanceUpdate = (e) => {
+      if (e?.detail?.balance !== undefined) {
+        setDemoUpiCash(Number(e.detail.balance));
+      } else {
+        const role = localStorage.getItem("role");
+        const isEdu = isEducator || role === "educator" || Boolean(getCookie("admin"));
+        if (isEdu) {
+          const savedEducator = localStorage.getItem("educator_inr_balance") || localStorage.getItem("educator_inr_earnings");
+          if (savedEducator !== null && savedEducator !== undefined) {
+            setDemoUpiCash(Number(savedEducator));
+            return;
+          }
+        }
+        const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
+        if (saved !== null && saved !== undefined) {
+          setDemoUpiCash(Number(saved));
+        }
+      }
+    };
+    window.addEventListener("edusphere_balance_updated", handleBalanceUpdate);
+    window.addEventListener("storage", handleBalanceUpdate);
+    return () => {
+      window.removeEventListener("edusphere_balance_updated", handleBalanceUpdate);
+      window.removeEventListener("storage", handleBalanceUpdate);
+    };
+  }, [isEducator]);
   const [upiPin, setUpiPin] = useState("");
   const [educatorBillData, setEducatorBillData] = useState(null);
   const [activeReceiptTab, setActiveReceiptTab] = useState("student"); // "student" | "educator"
-
-
 
   // Video Player Controls State
   const videoRef = useRef(null);
@@ -105,29 +237,8 @@ const CourseDetails = () => {
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef(null);
 
-  // Navbar / Theme / Wallet
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const { walletAddress, walletConnected, connectWallet } = useWallet();
-  const isDarkMode = useThemeStore((state) => state.isDarkMode);
-  const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
-  const { setTheme } = useTheme();
-  const dropdownRef = useRef(null);
-  const navigate = useNavigate();
-
-  const { writeContractAsync } = useWriteContract();
-
-  // Role detection
-  const userRole = localStorage.getItem("role") || "student";
-  const educatorWallet = course?.author_wallet_id;
-  const isAuthor =
-    educatorWallet &&
-    walletAddress &&
-    educatorWallet.toLowerCase() === walletAddress.toLowerCase();
-  const isEducator =
-    userRole === "educator" || isAuthor || Boolean(getCookie("admin"));
-
-  // Full access: educators always unlocked; students unlocked if enrolled / purchased
-  const isUnlocked = isEducator || isPurchased;
+  // Full access: course author is always unlocked; all others (students & educators) unlocked only if purchased
+  const isUnlocked = isAuthor || isPurchased;
 
   // Toggle Theme
   const toggleTheme = () => {
@@ -223,12 +334,15 @@ const CourseDetails = () => {
       }
     }
 
-    // Check backend my-learning enrollment if student token exists
-    const token = getCookie("user");
-    if (token) {
+    // Check backend my-learning enrollment if token or wallet exists
+    const token = getCookie("admin") || getCookie("user");
+    const activeWallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem("educatorWallet") || getCookie("walletAddress") || "";
+    const activeName = localStorage.getItem("username") || localStorage.getItem("educatorName") || localStorage.getItem("studentName") || "";
+    if (token || activeWallet) {
       axios
         .get(`${API_BASE_URL}/user/my-learning`, {
-          headers: { Authorization: `Bearer ${token}` }
+          params: { wallet: activeWallet, student_name: activeName },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
         })
         .then((res) => {
           if (res.data?.courses_enrolled) {
@@ -270,56 +384,126 @@ const CourseDetails = () => {
     return () => clearInterval(timer);
   }, [paymentStep, countdown]);
 
-  // Fetch student's Demo UPI Cash balance from backend / localStorage
+  // Fetch student's / educator's UPI Cash balance from backend / localStorage
   const fetchDemoCash = async () => {
     try {
-      const token = getCookie("user");
-      const res = await axios.get(`${API_BASE_URL}/user/demo-upi-balance`, {
-        params: {
-          wallet: walletAddress || "",
-          name: localStorage.getItem("username") || ""
-        },
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.data?.demo_balance !== undefined) {
-        setDemoUpiCash(res.data.demo_balance);
-        localStorage.setItem("demo_upi_cash", String(res.data.demo_balance));
+      const role = localStorage.getItem("role");
+      const isEdu = isEducator || role === "educator" || Boolean(getCookie("admin"));
+      const activeWallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem("educatorWallet") || getCookie("walletAddress") || "";
+      const activeName = (isEdu ? (localStorage.getItem("educatorName") || localStorage.getItem("name")) : (localStorage.getItem("studentName") || localStorage.getItem("name"))) || localStorage.getItem("username") || "";
+
+      if (isEdu) {
+        const token = getCookie("admin");
+        const res = await axios.get(`${API_BASE_URL}/admin/inr-earnings`, {
+          params: { wallet: activeWallet, name: activeName },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const amt = res.data?.inr_earnings ?? 0;
+        const bal = res.data?.inr_balance ?? amt;
+        setDemoUpiCash(bal);
+        localStorage.setItem("educator_inr_earnings", String(amt));
+        localStorage.setItem("educator_inr_balance", String(bal));
+      } else {
+        const token = getCookie("user");
+        const res = await axios.get(`${API_BASE_URL}/user/demo-upi-balance`, {
+          params: {
+            wallet: activeWallet,
+            name: activeName
+          },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.data?.inr_balance !== undefined || res.data?.demo_balance !== undefined) {
+          const bal = res.data?.inr_balance ?? res.data?.demo_balance;
+          setDemoUpiCash(bal);
+          localStorage.setItem("student_inr_cash", String(bal));
+          localStorage.setItem("demo_upi_cash", String(bal));
+        }
       }
     } catch (e) {
-      const saved = localStorage.getItem("demo_upi_cash");
-      setDemoUpiCash(saved ? Number(saved) : 10000);
+      const role = localStorage.getItem("role");
+      const isEdu = isEducator || role === "educator" || Boolean(getCookie("admin"));
+      if (isEdu) {
+        const saved = localStorage.getItem("educator_inr_balance") || localStorage.getItem("educator_inr_earnings");
+        if (saved) setDemoUpiCash(Number(saved));
+      } else {
+        const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
+        if (saved) setDemoUpiCash(Number(saved));
+      }
     }
   };
 
   useEffect(() => {
     fetchDemoCash();
-  }, [walletAddress]);
+  }, [walletAddress, isEducator]);
 
   const handleAddDemoCash = async (amt = 500) => {
-    try {
-      const token = getCookie("user");
-      const res = await axios.post(
-        `${API_BASE_URL}/user/demo-upi-add-cash`,
-        {
-          amount: amt,
-          wallet: walletAddress || "",
-          name: localStorage.getItem("username") || ""
-        },
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        }
-      );
-      const newBal = res.data?.new_balance !== undefined ? res.data.new_balance : (demoUpiCash + amt);
-      setDemoUpiCash(newBal);
-      localStorage.setItem("student_inr_cash", String(newBal));
-      localStorage.setItem("demo_upi_cash", String(newBal));
-      toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
-    } catch (e) {
-      const newBal = demoUpiCash + amt;
-      setDemoUpiCash(newBal);
-      localStorage.setItem("student_inr_cash", String(newBal));
-      localStorage.setItem("demo_upi_cash", String(newBal));
-      toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+    const role = localStorage.getItem("role");
+    const isEdu = isEducator || role === "educator" || Boolean(getCookie("admin"));
+    const activeWallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem("educatorWallet") || getCookie("walletAddress") || "";
+    const activeName = (isEdu ? (localStorage.getItem("educatorName") || localStorage.getItem("name")) : (localStorage.getItem("studentName") || localStorage.getItem("name"))) || localStorage.getItem("username") || "";
+
+    if (isEdu) {
+      try {
+        const token = getCookie("admin");
+        const res = await axios.post(
+          `${API_BASE_URL}/admin/add-inr`,
+          {
+            amount: amt,
+            wallet: activeWallet,
+            name: activeName
+          },
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          }
+        );
+        const newBal = res.data?.new_balance !== undefined ? res.data.new_balance : (demoUpiCash + amt);
+        setDemoUpiCash(newBal);
+        localStorage.setItem("educator_inr_balance", String(newBal));
+        try {
+          window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: newBal, isEducator: true } }));
+        } catch (err) {}
+        toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+      } catch (e) {
+        const newBal = demoUpiCash + amt;
+        setDemoUpiCash(newBal);
+        localStorage.setItem("educator_inr_balance", String(newBal));
+        try {
+          window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: newBal, isEducator: true } }));
+        } catch (err) {}
+        toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+      }
+    } else {
+      try {
+        const token = getCookie("user");
+        const res = await axios.post(
+          `${API_BASE_URL}/user/demo-upi-add-cash`,
+          {
+            amount: amt,
+            wallet: activeWallet,
+            name: activeName
+          },
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {}
+          }
+        );
+        const newBal = res.data?.new_balance !== undefined ? res.data.new_balance : (demoUpiCash + amt);
+        setDemoUpiCash(newBal);
+        localStorage.setItem("student_inr_cash", String(newBal));
+        localStorage.setItem("demo_upi_cash", String(newBal));
+        try {
+          window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: newBal, isEducator: false } }));
+        } catch (err) {}
+        toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+      } catch (e) {
+        const newBal = demoUpiCash + amt;
+        setDemoUpiCash(newBal);
+        localStorage.setItem("student_inr_cash", String(newBal));
+        localStorage.setItem("demo_upi_cash", String(newBal));
+        try {
+          window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: newBal, isEducator: false } }));
+        } catch (err) {}
+        toast.success(`🎉 Added ₹${amt} Indian Rupees! New Balance: ₹${newBal}`);
+      }
     }
   };
 
@@ -340,15 +524,23 @@ const CourseDetails = () => {
 
   // Verification function called on payment success
   const verifyAndEnroll = async (paymentResponse) => {
-    const token = getCookie("user");
-    const studentName =
+    const token = getCookie("admin") || getCookie("user");
+    const role = localStorage.getItem("role");
+    const isEdu = isEducator || role === "educator" || Boolean(getCookie("admin"));
+    const buyerName =
+      (isEdu ? (localStorage.getItem("educatorName") || localStorage.getItem("name")) : (localStorage.getItem("studentName") || localStorage.getItem("name"))) ||
       localStorage.getItem("username") ||
-      localStorage.getItem("studentName") ||
-      "Student";
+      (isEdu ? "Educator" : "Student");
+    const buyerWallet =
+      walletAddress ||
+      localStorage.getItem("walletAddress") ||
+      localStorage.getItem("educatorWallet") ||
+      getCookie("walletAddress") ||
+      "";
 
     setIsVerifyingGateway(true);
     try {
-      toast.info("Verifying UPI payment with Razorpay gateway...");
+      toast.info("Verifying payment with Indian Rupee gateway...");
       const verifyRes = await axios.post(
         `${API_BASE_URL}/user/razorpay-verify`,
         {
@@ -356,9 +548,10 @@ const CourseDetails = () => {
           razorpay_payment_id: paymentResponse.razorpay_payment_id,
           razorpay_signature: paymentResponse.razorpay_signature || "simulated_sig",
           course_id: course?._id || id,
-          student_wallet: walletAddress || "",
-          student_name: studentName,
-          amount: exactAmountInr
+          student_wallet: buyerWallet,
+          student_name: buyerName,
+          amount: exactAmountInr,
+          buyer_role: isEdu ? "educator" : "student"
         },
         {
           headers: {
@@ -369,14 +562,20 @@ const CourseDetails = () => {
       );
 
       if (verifyRes.data?.enrolled || verifyRes.data?.success) {
-        // Deduct from local student INR cash balance
+        // Deduct from local INR cash balance
         const updatedCash = verifyRes.data?.student_remaining_balance !== undefined
           ? verifyRes.data.student_remaining_balance
           : Math.max(0, demoUpiCash - exactAmountInr);
         setDemoUpiCash(updatedCash);
         try {
-          localStorage.setItem("student_inr_cash", String(updatedCash));
-          localStorage.setItem("demo_upi_cash", String(updatedCash));
+          if (isEdu) {
+            localStorage.setItem("educator_inr_balance", String(updatedCash));
+            window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: updatedCash, isEducator: true } }));
+          } else {
+            localStorage.setItem("student_inr_cash", String(updatedCash));
+            localStorage.setItem("demo_upi_cash", String(updatedCash));
+            window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: updatedCash, isEducator: false } }));
+          }
         } catch (e) {}
         setUpiPin("");
 
@@ -394,6 +593,9 @@ const CourseDetails = () => {
           const cid = course?._id || id;
           if (!list.includes(cid)) list.push(cid);
           localStorage.setItem("enrolled_courses", JSON.stringify(list));
+          if (buyerWallet) {
+            localStorage.setItem(`enrolled_${buyerWallet.toLowerCase()}_${cid}`, "true");
+          }
         } catch (e) {}
 
         setIsPurchased(true);
@@ -403,7 +605,7 @@ const CourseDetails = () => {
         // Dual Receipts: Student & Educator
         const studentRec = verifyRes.data?.receipt || {
           invoice_no: `EDUPAY-${Date.now().toString().slice(-6)}`,
-          student_name: studentName,
+          student_name: buyerName,
           educator_name: course?.author_name || "Educator",
           course_title: course?.title || "Course",
           amount: exactAmountInr,
@@ -417,7 +619,7 @@ const CourseDetails = () => {
         const educatorRec = verifyRes.data?.educator_receipt || {
           voucher_no: `EDUEARN-${Date.now().toString().slice(-6)}`,
           educator_name: course?.author_name || "Educator",
-          student_name: studentName,
+          student_name: buyerName,
           course_title: course?.title || "Course",
           amount_credited: exactAmountInr,
           currency: "INR",
@@ -429,6 +631,28 @@ const CourseDetails = () => {
         setBillData(studentRec);
         setEducatorBillData(educatorRec);
         setShowBillModal(true);
+
+        try {
+          const eduTxns = JSON.parse(localStorage.getItem("educator_transactions") || "[]");
+          eduTxns.unshift({
+            _id: verifyRes.data?.transaction?._id || `sale_${Date.now()}`,
+            type: "sales",
+            type_label: "Student Course Sale",
+            student_name: buyerName,
+            course_purchased: course?.title || "Course",
+            educator_name: course?.author_name || "Educator",
+            amount: exactAmountInr,
+            currency: "INR",
+            payment_method: "Indian Rupees (₹)",
+            transaction_address: paymentResponse.razorpay_payment_id,
+            invoice_no: educatorRec.voucher_no,
+            purchase_date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+            status: "SUCCESS",
+            is_credit: true
+          });
+          localStorage.setItem("educator_transactions", JSON.stringify(eduTxns));
+          localStorage.setItem("educator_purchases", JSON.stringify(eduTxns));
+        } catch (e) {}
 
         toast.success(`🎉 Paid ₹${exactAmountInr} INR! Credited to Educator (${course?.author_name || "Educator"}). Remaining Balance: ₹${updatedCash}`);
       } else {
@@ -814,8 +1038,8 @@ const CourseDetails = () => {
 
   // ── Educator: Delete Current Video ────────────────────────────────
   const handleDeleteCurrentVideo = async () => {
-    if (!isEducator) {
-      toast.error("Only educators can delete course videos.");
+    if (!isAuthor) {
+      toast.error("Only the author educator of this course can delete videos.");
       return;
     }
     if (videosList.length === 0) {
@@ -864,8 +1088,8 @@ const CourseDetails = () => {
   // ── Educator: Publish More Videos ─────────────────────────────────
   const handlePublishNewVideo = async (e) => {
     e.preventDefault();
-    if (!isEducator) {
-      toast.error("Only educators can publish videos.");
+    if (!isAuthor) {
+      toast.error("Only the author educator of this course can publish videos.");
       return;
     }
 
@@ -953,9 +1177,9 @@ const CourseDetails = () => {
       return;
     }
 
-    const token = getCookie("user");
+    const token = getCookie("admin") || getCookie("user");
     if (!token) {
-      toast.warn("Please add your Student details first before purchasing.");
+      toast.warn("Please add your account details first before purchasing.");
       navigate("/signup");
       return;
     }
@@ -987,7 +1211,7 @@ const CourseDetails = () => {
       educatorTargetWallet.toLowerCase() === walletAddress.toLowerCase()
     ) {
       toast.warn(
-        "You are logged in with the educator wallet. Switch to student wallet to purchase."
+        "You are the educator of this course. You cannot purchase your own course."
       );
       return;
     }
@@ -1048,11 +1272,18 @@ const CourseDetails = () => {
 
       toast.info("ETH transfer submitted on-chain! Finalizing course enrollment...");
 
+      const studentDisplayName = localStorage.getItem("username") || localStorage.getItem("studentName") || "Student";
       const response = await axios.post(
         `${API_BASE_URL}/user/purchase-course`,
         {
           course_id: course._id,
-          transaction_id: txHash
+          transaction_id: txHash,
+          payment_method: "MetaMask (ETH)",
+          amount: Number(validPrice || 0),
+          currency: "ETH",
+          student_wallet: walletAddress || localStorage.getItem("walletAddress") || "",
+          student_name: studentDisplayName,
+          blockchain_hash: txHash
         },
         {
           headers: {
@@ -1081,8 +1312,16 @@ const CourseDetails = () => {
 
       setIsPurchased(true);
 
+      // Update educator earnings and dispatch event
+      if (response.data?.educator_total_earnings !== undefined) {
+        try {
+          localStorage.setItem("educator_inr_earnings", String(response.data.educator_total_earnings));
+          localStorage.setItem("educator_inr_balance", String(response.data.educator_total_earnings));
+          window.dispatchEvent(new CustomEvent("edusphere_balance_updated", { detail: { balance: response.data.educator_total_earnings, isEducator: true } }));
+        } catch (e) {}
+      }
+
       // Prepare official bill / receipt for ETH purchase
-      const studentDisplayName = localStorage.getItem("username") || localStorage.getItem("studentName") || "Hitanshu";
       const receipt = {
         invoice_no: `EDUPAY-${Date.now().toString().slice(-6)}`,
         student_name: studentDisplayName,
@@ -1096,7 +1335,43 @@ const CourseDetails = () => {
         date: new Date().toLocaleString(),
         status: "PAID & VERIFIED ON-CHAIN"
       };
+
+      const educatorRec = response.data?.educator_receipt || {
+        voucher_no: `EDUEARN-${Date.now().toString().slice(-6)}`,
+        educator_name: course?.author_name || "Educator",
+        student_name: studentDisplayName,
+        course_title: course?.title || "Course",
+        amount_credited: validPrice,
+        currency: "ETH",
+        payment_id: txHash,
+        date: new Date().toLocaleString("en-IN"),
+        status: "CREDITED TO EDUCATOR REVENUE (ETH)"
+      };
+
+      try {
+        const eduTxns = JSON.parse(localStorage.getItem("educator_transactions") || "[]");
+        eduTxns.unshift({
+          _id: response.data?.transaction?._id || `sale_${Date.now()}`,
+          type: "sales",
+          type_label: "Student Course Sale",
+          student_name: studentDisplayName,
+          course_purchased: course?.title || "Course",
+          educator_name: course?.author_name || "Educator",
+          amount: validPrice,
+          currency: "ETH",
+          payment_method: "MetaMask (ETH)",
+          transaction_address: txHash,
+          invoice_no: educatorRec.voucher_no,
+          purchase_date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+          status: "SUCCESS",
+          is_credit: true
+        });
+        localStorage.setItem("educator_transactions", JSON.stringify(eduTxns));
+        localStorage.setItem("educator_purchases", JSON.stringify(eduTxns));
+      } catch (e) {}
+
       setBillData(receipt);
+      setEducatorBillData(educatorRec);
       setShowBillModal(true);
 
       toast.success(
@@ -1178,81 +1453,7 @@ const CourseDetails = () => {
 
         {/* Right Nav Utilities */}
         <div className="flex items-center gap-3">
-          {/* User / Wallet Profile Dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-800/80 hover:bg-gray-700/80 border border-gray-700 text-xs font-semibold transition-colors"
-            >
-              <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                <FiUser className="w-3.5 h-3.5" />
-              </div>
-              <span className="hidden sm:inline">
-                {isEducator ? "Educator Hub" : "Student Hub"}
-              </span>
-            </button>
-
-            <AnimatePresence>
-              {dropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-gray-900 border border-gray-800 shadow-2xl p-3 z-50 text-xs space-y-1"
-                >
-                  <div className="p-2 border-b border-gray-800 mb-2">
-                    <p className="text-gray-400">Active Role:</p>
-                    <p className="font-bold text-amber-400 uppercase text-xs">
-                      {isEducator ? "Educator" : "Student"}
-                    </p>
-                  </div>
-                  {isEducator ? (
-                    <>
-                      <Link
-                        to="/educatorhome"
-                        className="block px-3 py-2 rounded-xl hover:bg-gray-800 text-gray-200 transition-colors"
-                      >
-                        Educator Dashboard
-                      </Link>
-                      <Link
-                        to="/managecourses"
-                        className="block px-3 py-2 rounded-xl hover:bg-gray-800 text-gray-200 transition-colors"
-                      >
-                        Manage My Courses
-                      </Link>
-                      <Link
-                        to="/createcourses"
-                        className="block px-3 py-2 rounded-xl hover:bg-gray-800 text-gray-200 transition-colors"
-                      >
-                        Publish New Course
-                      </Link>
-                    </>
-                  ) : (
-                    <>
-                      <Link
-                        to="/studenthome"
-                        className="block px-3 py-2 rounded-xl hover:bg-gray-800 text-gray-200 transition-colors"
-                      >
-                        Student Dashboard
-                      </Link>
-                      <Link
-                        to="/mylearning"
-                        className="block px-3 py-2 rounded-xl hover:bg-gray-800 text-gray-200 transition-colors"
-                      >
-                        My Learning & Enrolled Courses
-                      </Link>
-                      <Link
-                        to="/courses"
-                        className="block px-3 py-2 rounded-xl hover:bg-gray-800 text-gray-200 transition-colors"
-                      >
-                        Explore All Courses
-                      </Link>
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          
 
           {/* Wallet Button */}
           <motion.button
@@ -1289,6 +1490,9 @@ const CourseDetails = () => {
           >
             {isDarkMode ? "🌙" : "☀️"}
           </button>
+
+          {/* Unified Three-Line Menu */}
+          <ThreeLineMenu isEducator={isEducator} isDarkMode={isDarkMode} />
         </div>
       </nav>
 
@@ -1401,20 +1605,21 @@ const CourseDetails = () => {
               </div>
 
               <div className="flex items-center justify-between">
-                <span className="text-gray-400 font-medium">Price:</span>
-                <div className="text-right">
-                  <span className="font-extrabold text-amber-400 text-sm block">
-                    {course.currency === "INR" ? `₹${exactAmountInr} INR` : `${exactAmountEth} ETH`}
+                <span className="text-gray-400 font-medium">Pricing:</span>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 font-black text-xs font-mono shadow-sm">
+                    Ξ {exactAmountEth} ETH
                   </span>
-                  <span className="text-[11px] text-gray-400 font-mono block">
-                    {course.currency === "INR" ? `~${exactAmountEth} ETH` : `~₹${exactAmountInr} INR`}
+                  <span className="text-gray-500 text-xs font-bold">or</span>
+                  <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs font-mono shadow-sm">
+                    ₹ {Number(exactAmountInr).toLocaleString("en-IN")} UPI
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Buy Action Buttons for Students */}
-            {!isEducator && (
+            {/* Buy Action Buttons (Available for Students & other Educators) */}
+            {!isAuthor && (
               <div className="mt-6 pt-4 border-t border-gray-800 space-y-3">
                 {isPurchased ? (
                   <div className="w-full py-3.5 rounded-xl font-bold text-sm bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center gap-2">
@@ -1424,43 +1629,47 @@ const CourseDetails = () => {
                 ) : (
                   <div className="space-y-2">
                     {/* Student Rupee Balance Quick Indicator */}
-                    <div className="flex items-center justify-between text-xs px-1 text-gray-400">
-                      <span>Your Rupee Balance:</span>
-                      <span className="font-extrabold text-emerald-400">₹{Number(demoUpiCash).toLocaleString("en-IN")} INR</span>
-                    </div>
+                    {walletConnected && (
+                      <div className="flex items-center justify-between text-xs px-1 text-gray-400">
+                        <span>Your Rupee Balance:</span>
+                        <span className="font-extrabold text-emerald-400">₹{Number(demoUpiCash).toLocaleString("en-IN")} INR</span>
+                      </div>
+                    )}
 
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleOpenRupeeModal}
-                      className="w-full py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      <FiDollarSign className="w-4 h-4" />
-                      <span>⚡ Buy with Indian Rupees (₹{exactAmountInr})</span>
-                    </motion.button>
-
+                    {/* 1. Enroll with ETH (FIRST) */}
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={handlePurchase}
                       disabled={isBuying}
-                      className={`w-full py-2.5 rounded-xl font-bold text-xs border flex items-center justify-center gap-2 transition-all ${
+                      className={`w-full py-3 rounded-xl font-black text-xs sm:text-sm border flex items-center justify-center gap-2 transition-all ${
                         isBuying
                           ? "bg-amber-600/70 text-white cursor-wait border-amber-600"
-                          : "bg-gray-800 hover:bg-gray-700 text-amber-300 border-amber-500/40"
+                          : "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-md shadow-amber-500/25 border-amber-400 cursor-pointer"
                       }`}
                     >
                       {isBuying ? (
                         <>
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
                           <span>Confirming in MetaMask...</span>
                         </>
                       ) : (
                         <>
-                          <FiUnlock className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Enroll with ETH ({exactAmountEth} ETH)</span>
+                          <FiUnlock className="w-4 h-4 text-black" />
+                          <span>⟠ Enroll with ETH ({exactAmountEth} ETH)</span>
                         </>
                       )}
+                    </motion.button>
+
+                    {/* 2. Buy with UPI / INR (SECOND) — Same font size & attractive */}
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleOpenRupeeModal}
+                      className="w-full py-3 rounded-xl font-black text-xs sm:text-sm bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    >
+                      <FiDollarSign className="w-4 h-4" />
+                      <span>⚡ Buy with UPI / INR (₹{Number(exactAmountInr).toLocaleString("en-IN")})</span>
                     </motion.button>
                   </div>
                 )}
@@ -1503,36 +1712,27 @@ const CourseDetails = () => {
 
                   <div className="flex items-center gap-4 sm:gap-6 mb-5 px-6 py-2.5 rounded-2xl bg-black/70 border border-amber-500/30 backdrop-blur-md">
                     <div className="text-center">
-                      <span className="text-[10px] text-gray-400 uppercase tracking-wider block">⚡ Indian Rupees (₹)</span>
-                      <span className="text-base sm:text-lg font-black text-emerald-400">₹{exactAmountInr}</span>
+                      <span className="text-[10px] text-amber-400 uppercase tracking-wider block font-bold">⟠ MetaMask / ETH</span>
+                      <span className="text-base sm:text-lg font-black text-amber-300 font-mono">{exactAmountEth} ETH</span>
                     </div>
                     <div className="w-px h-8 bg-gray-700" />
                     <div className="text-center">
-                      <span className="text-[10px] text-gray-400 uppercase tracking-wider block">⟠ MetaMask</span>
-                      <span className="text-base sm:text-lg font-black text-amber-400">{exactAmountEth} ETH</span>
+                      <span className="text-[10px] text-emerald-400 uppercase tracking-wider block font-bold">⚡ Indian Rupees (UPI)</span>
+                      <span className="text-base sm:text-lg font-black text-emerald-300 font-mono">₹{Number(exactAmountInr).toLocaleString("en-IN")}</span>
                     </div>
                   </div>
 
                   <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
-                    <motion.button
-                      whileHover={{ scale: 1.03 }}
-                      whileTap={{ scale: 0.97 }}
-                      onClick={handleOpenRupeeModal}
-                      className="px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
-                    >
-                      <FiDollarSign className="w-4 h-4" />
-                      <span>⚡ Buy with Indian Rupees (₹{exactAmountInr})</span>
-                    </motion.button>
-
+                    {/* 1. ETH Enroll Button (FIRST) */}
                     <motion.button
                       whileHover={{ scale: 1.03 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={handlePurchase}
                       disabled={isBuying}
-                      className={`px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all ${
+                      className={`px-6 py-3.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
                         isBuying
                           ? "bg-amber-600 text-white cursor-wait"
-                          : "bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/20"
+                          : "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-lg shadow-amber-500/25"
                       }`}
                     >
                       {isBuying ? (
@@ -1542,10 +1742,21 @@ const CourseDetails = () => {
                         </>
                       ) : (
                         <>
-                          <FiUnlock className="w-4 h-4" />
+                          <FiUnlock className="w-4 h-4 text-black" />
                           <span>⟠ Enroll with ETH — {exactAmountEth} ETH</span>
                         </>
                       )}
+                    </motion.button>
+
+                    {/* 2. UPI / INR Button (SECOND) */}
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={handleOpenRupeeModal}
+                      className="px-6 py-3.5 rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                    >
+                      <FiDollarSign className="w-4 h-4" />
+                      <span>⚡ Buy with UPI / INR (₹{Number(exactAmountInr).toLocaleString("en-IN")})</span>
                     </motion.button>
                   </div>
                 </div>
@@ -1583,13 +1794,20 @@ const CourseDetails = () => {
                       Your browser does not support the video tag.
                     </video>
 
-                    {/* Captions Overlay Track */}
+                    {/* Captions Overlay Track with Synchronized Real Speech Subtitles */}
                     {showCaptions && (
-                      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 max-w-xl w-11/12 text-center pointer-events-none transition-opacity">
-                        <span className="inline-block px-4 py-1.5 rounded-lg bg-black/80 text-amber-300 text-xs sm:text-sm font-semibold border border-amber-400/20 backdrop-blur-sm shadow-md">
-                          [CC] {currentVideoTitle} &bull; Section{" "}
-                          {formatTime(currentTime)}
-                        </span>
+                      <div className="absolute bottom-20 left-1/2 -translate-x-1/2 max-w-2xl w-11/12 text-center pointer-events-none transition-all duration-300 z-30">
+                        <div className="inline-flex flex-col items-center gap-1 px-4 py-2 rounded-xl bg-black/90 text-amber-300 border border-amber-500/30 backdrop-blur-md shadow-2xl">
+                          <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-wider text-amber-400/80">
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/40 text-amber-300">CC</span>
+                            <span>{currentVideoTitle}</span>
+                            <span>&bull;</span>
+                            <span>{formatTime(currentTime)}</span>
+                          </div>
+                          <p className="text-xs sm:text-sm md:text-base font-medium text-white tracking-wide leading-relaxed">
+                            "{getSpeechCaption(course?.title, currentVideoTitle, currentTime)}"
+                          </p>
+                        </div>
                       </div>
                     )}
 
@@ -1798,11 +2016,11 @@ const CourseDetails = () => {
                       No Videos Uploaded Yet
                     </h3>
                     <p className="text-xs text-gray-400 max-w-sm mb-4">
-                      {isEducator
-                        ? "As the educator of this course, you can publish your first lesson video below."
+                      {isAuthor
+                        ? "As the author educator of this course, you can publish your first lesson video below."
                         : "The educator has not yet published lecture videos for this course. Please check back soon."}
                     </p>
-                    {isEducator && (
+                    {isAuthor && (
                       <button
                         onClick={() => setShowAddVideoModal(true)}
                         className="px-5 py-2.5 rounded-xl font-bold text-xs bg-amber-500 text-black hover:bg-amber-400 transition-all flex items-center gap-2"
@@ -1823,8 +2041,8 @@ const CourseDetails = () => {
                   {currentVideoTitle}
                 </h2>
 
-                {/* Educator Actions: Delete Video & Publish More Videos */}
-                {isEducator && (
+                {/* Author Educator Actions: Delete Video & Publish More Videos */}
+                {isAuthor && (
                   <div className="flex items-center gap-2 shrink-0">
                     {videosList.length > 0 && (
                       <button
@@ -2036,7 +2254,7 @@ const CourseDetails = () => {
                       Buy with Indian Rupees (₹)
                     </h3>
                     <p className="text-[11px] text-emerald-200">
-                      Direct Student-to-Educator Transfer
+                      {isEducator ? "Direct Educator-to-Educator Transfer" : "Direct Student-to-Educator Transfer"}
                     </p>
                   </div>
                 </div>
@@ -2075,7 +2293,7 @@ const CourseDetails = () => {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 block">
-                        Student Rupee Balance
+                        {isEducator ? "Educator Rupee Balance" : "Student Rupee Balance"}
                       </span>
                       <div className="text-2xl font-black text-white mt-0.5">
                         ₹{Number(demoUpiCash).toLocaleString("en-IN")}{" "}
@@ -2103,7 +2321,7 @@ const CourseDetails = () => {
                   {/* Transfer Breakdown */}
                   <div className="space-y-1.5 pt-2 border-t border-gray-700/60 text-xs">
                     <div className="flex justify-between text-gray-300">
-                      <span>Deduction from Student:</span>
+                      <span>{isEducator ? "Deduction from Educator:" : "Deduction from Student:"}</span>
                       <span className="text-red-400 font-bold">- ₹{exactAmountInr} INR</span>
                     </div>
                     <div className="flex justify-between text-gray-300">
@@ -2111,7 +2329,7 @@ const CourseDetails = () => {
                       <span className="text-emerald-400 font-bold">+ ₹{exactAmountInr} INR</span>
                     </div>
                     <div className="flex justify-between text-white font-semibold pt-1 border-t border-gray-700/40">
-                      <span>Student Remaining Balance:</span>
+                      <span>{isEducator ? "Educator Remaining Balance:" : "Student Remaining Balance:"}</span>
                       <span className="text-amber-400 font-bold">
                         ₹{Number(Math.max(0, demoUpiCash - exactAmountInr)).toLocaleString("en-IN")} INR
                       </span>

@@ -6,6 +6,7 @@ import {
   FiAward,
   FiBookOpen,
   FiCheckCircle,
+  FiXCircle,
   FiLock,
   FiPlus,
   FiSearch,
@@ -27,6 +28,7 @@ import { useThemeStore } from "../../store/themeStore";
 import { useTheme } from "next-themes";
 import { fetchAllTests, deleteTest, fetchMySubmissions } from "../../utils/testsApi";
 import ImageZoomModal from "./ImageZoomModal";
+import ThreeLineMenu from "../ThreeLineMenu";
 
 const TestList = () => {
   const [tests, setTests] = useState([]);
@@ -103,7 +105,7 @@ const TestList = () => {
   }, []);
 
   // Filter tests based on category and search query
-  const categories = ["All", "Web3", "Frontend", "DeFi", "Security", "AI & ML"];
+  const categories = ["All", "Web3", "Frontend", "DeFi", "Security", "AI & ML", "College Course", "School Course"];
 
   const filteredTests = tests.filter((test) => {
     const matchesCategory =
@@ -115,12 +117,40 @@ const TestList = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const handleStartTest = (testId) => {
+  const handleStartTest = (test) => {
     if (!walletConnected || !walletAddress) {
       setShowConnectModal(true);
       return;
     }
+    const testId = typeof test === "object" ? test._id : test;
+    const testObj = typeof test === "object" ? test : tests.find(t => String(t._id) === String(testId));
+
+    if (testObj && testObj.test_type === "scheduled" && testObj.schedule_start && testObj.schedule_end) {
+      const now = new Date();
+      const start = new Date(testObj.schedule_start);
+      const end = new Date(testObj.schedule_end);
+
+      if (now < start) {
+        toast.info(`🕒 Assessment not started yet! This test is scheduled from ${formatScheduleTime(testObj.schedule_start)} to ${formatScheduleTime(testObj.schedule_end)}.`);
+        return;
+      }
+      if (now > end) {
+        toast.error(`❌ The scheduled window for this assessment ended at ${formatScheduleTime(testObj.schedule_end)}. You can no longer attempt it.`);
+        return;
+      }
+    }
+
     navigate(`/tests/${testId}`);
+  };
+
+  const formatScheduleTime = (dateStr) => {
+    if (!dateStr) return "";
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ', ' + d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    } catch (e) {
+      return dateStr;
+    }
   };
 
   return (
@@ -158,10 +188,12 @@ const TestList = () => {
               Tests
               <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-amber-400"></span>
             </Link>
-            <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
-              Contest
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
-            </Link>
+            {!isEducator && (
+              <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+                Contest
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
+              </Link>
+            )}
           </div>
 
           {/* Wallet Button */}
@@ -221,102 +253,19 @@ const TestList = () => {
 
           {/* Student shortcuts */}
           {!isEducator && (
-            <div className="hidden lg:flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
               <Link
                 to="/my-test-marks"
                 className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-400 hover:bg-emerald-500 hover:text-black font-semibold text-sm transition-all"
               >
                 <FiAward className="w-4 h-4" />
-                <span>My Test History & Review</span>
+                <span>Student Test Review</span>
               </Link>
             </div>
           )}
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full font-bold hover:shadow-md transition-all"
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl backdrop-blur-lg ${
-                    isDarkMode ? "bg-gray-800/95 border border-gray-700" : "bg-white/95 border border-amber-100"
-                  } z-50`}
-                >
-                  <div className="p-2 space-y-1 text-sm">
-                    <Link
-                      to="/tests"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 text-amber-400 font-semibold"
-                    >
-                      <FiBookOpen className="text-amber-400" />
-                      <span>Test Facility</span>
-                    </Link>
-                    {isEducator ? (
-                      <>
-                        <Link
-                          to="/create-test"
-                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                        >
-                          <FiPlus className="text-amber-500" />
-                          <span>Create Assessment</span>
-                        </Link>
-                        <Link
-                          to="/educator-marks"
-                          className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                        >
-                          <FiAward className="text-emerald-400" />
-                          <span>All Student Marks</span>
-                        </Link>
-                      </>
-                    ) : (
-                      <Link
-                        to="/my-test-marks"
-                        className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                      >
-                        <FiAward className="text-amber-400" />
-                        <span>My Test Marks</span>
-                      </Link>
-                    )}
-                    <Link
-                      to="/courses"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Courses</span>
-                    </Link>
-                    <Link
-                      to="/mylearning"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBookOpen className="text-amber-500" />
-                      <span>My Learning</span>
-                    </Link>
-                    <Link
-                      to="/transaction"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiDollarSign className="text-amber-500" />
-                      <span>Transactions</span>
-                    </Link>
-                    <Link
-                      to="/redeem"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiGift className="text-amber-500" />
-                      <span>Redeem</span>
-                    </Link>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* 100% Uniform Three Line Menu Component */}
+          <ThreeLineMenu isEducator={isEducator} isDarkMode={isDarkMode} />
         </div>
       </nav>
 
@@ -430,6 +379,15 @@ const TestList = () => {
               const questionCount = test.questions?.length || 0;
               const pickCount = Math.min(test.pick_random_count || 5, questionCount);
 
+              const now = new Date();
+              const isScheduled = test.test_type === "scheduled" && test.schedule_start && test.schedule_end;
+              const scheduleStart = isScheduled ? new Date(test.schedule_start) : null;
+              const scheduleEnd = isScheduled ? new Date(test.schedule_end) : null;
+
+              const isUpcoming = isScheduled && scheduleStart && now < scheduleStart;
+              const isLive = isScheduled && scheduleStart && scheduleEnd && now >= scheduleStart && now <= scheduleEnd;
+              const isExpired = isScheduled && scheduleEnd && now > scheduleEnd;
+
               return (
                 <motion.div
                   key={test._id || index}
@@ -469,6 +427,29 @@ const TestList = () => {
                         {test.difficulty || "Intermediate"}
                       </span>
                     </div>
+
+                    {/* Scheduled Banner */}
+                    {isScheduled && (
+                      <div className="mb-3 p-2.5 rounded-xl border text-xs font-medium flex items-center justify-between gap-2 bg-amber-500/10 border-amber-500/30 text-amber-300">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <FiClock className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+                          <span className="truncate">
+                            {formatScheduleTime(test.schedule_start)} – {formatScheduleTime(test.schedule_end)}
+                          </span>
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                            isLive
+                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse"
+                              : isUpcoming
+                              ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                              : "bg-red-500/20 text-red-400 border border-red-500/40"
+                          }`}
+                        >
+                          {isLive ? "🟢 Live Window" : isUpcoming ? "🕒 Upcoming" : "🔴 Closed"}
+                        </span>
+                      </div>
+                    )}
 
                     {/* Test Title */}
                     <h3 className="text-xl font-bold mb-2.5 line-clamp-2 hover:text-amber-400 transition-colors">
@@ -524,13 +505,29 @@ const TestList = () => {
                         <FiAward className="w-4 h-4" />
                         <span>View Student Marks</span>
                       </Link>
+                    ) : isScheduled && isExpired ? (
+                      <button
+                        disabled
+                        className="w-full py-3 rounded-xl font-bold text-sm bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <FiXCircle className="w-4 h-4" />
+                        <span>Window Closed (Missed)</span>
+                      </button>
+                    ) : isScheduled && isUpcoming ? (
+                      <button
+                        onClick={() => handleStartTest(test)}
+                        className="w-full py-3 rounded-xl font-bold text-sm bg-amber-500/20 text-amber-400 border border-amber-500/40 hover:bg-amber-500/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+                      >
+                        <FiClock className="w-4 h-4" />
+                        <span>Starts at {new Date(test.schedule_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </button>
                     ) : (
                       <button
-                        onClick={() => handleStartTest(test._id)}
+                        onClick={() => handleStartTest(test)}
                         className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                       >
                         <FiCheckCircle className="w-4 h-4" />
-                        <span>Give Test</span>
+                        <span>{isScheduled ? "Give Test (Live Window)" : "Give Test"}</span>
                       </button>
                     )}
 

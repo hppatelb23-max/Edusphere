@@ -6,6 +6,12 @@ const AdminSchema = new mongoose.Schema({
         type:String,
         required:true
     },
+
+    locked_account_name:
+    {
+        type: String,
+        default: null
+    },
     
     metamask_wallet_id:
     {
@@ -15,6 +21,7 @@ const AdminSchema = new mongoose.Schema({
     },
     
     courses_created:[{type:mongoose.Schema.ObjectId ,ref:'Courses'}],
+    courses_enrolled:[{type:mongoose.Schema.ObjectId ,ref:'Courses'}],
     inr_earnings: {
         type: Number,
         default: 0

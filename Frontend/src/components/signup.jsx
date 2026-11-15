@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { FiUser, FiArrowLeft, FiCheckCircle, FiShield } from 'react-icons/fi';
 import { useWallet } from '../context/WalletProvider';
-import { API_BASE_URL, getCookie, setCookie } from '../utils/api';
+import { API_BASE_URL, getCookie, setCookie, deleteCookie } from '../utils/api';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -16,8 +16,10 @@ const LoginPage = () => {
   });
   const [currentWallet, setCurrentWallet] = useState(walletAddress || getCookie('walletAddress') || '');
   const [username, setUsername] = useState('');
+  const [lockedName, setLockedName] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check and sync locked account name for the connected wallet
   useEffect(() => {
     const savedRole = localStorage.getItem('role');
     if (savedRole) {
@@ -27,12 +29,48 @@ const LoginPage = () => {
     const addr = walletAddress || getCookie('walletAddress');
     if (addr) {
       setCurrentWallet(addr);
+      
+      const localLocked = localStorage.getItem(`account_locked_name_v2_${role}_${addr.toLowerCase()}`);
+      if (localLocked) {
+        setLockedName(localLocked);
+      }
+
+      // Check backend for registered locked name
+      const endpoint = role === 'educator' ? `${API_BASE_URL}/admin/account-locked-name` : `${API_BASE_URL}/user/account-locked-name`;
+      axios.get(`${endpoint}?wallet_id=${addr}`)
+        .then(res => {
+          if (res.data?.locked_name) {
+            setLockedName(res.data.locked_name);
+            localStorage.setItem(`account_locked_name_v2_${role}_${addr.toLowerCase()}`, res.data.locked_name);
+          }
+        })
+        .catch(() => {});
     }
-  }, [walletAddress]);
+  }, [walletAddress, role]);
 
   const handleRoleChange = (newRole) => {
     setRole(newRole);
     localStorage.setItem('role', newRole);
+    const addr = currentWallet || walletAddress || getCookie('walletAddress');
+    if (addr) {
+      const localLocked = localStorage.getItem(`account_locked_name_v2_${newRole}_${addr.toLowerCase()}`);
+      if (localLocked) {
+        setLockedName(localLocked);
+      } else {
+        setLockedName(null);
+      }
+      const endpoint = newRole === 'educator' ? `${API_BASE_URL}/admin/account-locked-name` : `${API_BASE_URL}/user/account-locked-name`;
+      axios.get(`${endpoint}?wallet_id=${addr}`)
+        .then(res => {
+          if (res.data?.locked_name) {
+            setLockedName(res.data.locked_name);
+            localStorage.setItem(`account_locked_name_v2_${newRole}_${addr.toLowerCase()}`, res.data.locked_name);
+          } else if (!localLocked) {
+            setLockedName(null);
+          }
+        })
+        .catch(() => {});
+    }
   };
 
   const handleConnect = async () => {
@@ -52,13 +90,18 @@ const LoginPage = () => {
       return;
     }
 
-    if (!username.trim()) {
+    const trimmedInput = username.trim();
+    if (!trimmedInput) {
       toast.warn('Please enter a username.');
       return;
     }
-    localStorage.setItem('username', username.trim());
-    localStorage.setItem('studentName', username.trim());
-    localStorage.setItem('name', username.trim());
+
+    // Client-side guard: if account already has a locked name, reject any different name
+    const effectiveLocked = lockedName || localStorage.getItem(`account_locked_name_v2_${role}_${activeWallet.toLowerCase()}`);
+    if (effectiveLocked && effectiveLocked.trim().toLowerCase() !== trimmedInput.toLowerCase()) {
+      toast.error('Incorrect username! Please write the right correct username to save and continue.');
+      return;
+    }
 
     setIsLoading(true);
 
@@ -67,7 +110,7 @@ const LoginPage = () => {
         const response = await axios.post(
           `${API_BASE_URL}/user/add-details`,
           {
-            username: username.trim(),
+            username: trimmedInput,
             wallet_id: activeWallet,
           },
           {
@@ -77,17 +120,30 @@ const LoginPage = () => {
 
         if (response.status === 200) {
           toast.success(response.data.message || 'Student details added successfully!');
+          deleteCookie('admin');
+          deleteCookie('adminWallet');
+          localStorage.removeItem('admin');
+          localStorage.removeItem('educatorName');
+          localStorage.removeItem('educatorWallet');
+          localStorage.removeItem('adminWallet');
+          localStorage.removeItem('educator_inr_balance');
+          localStorage.removeItem('educator_inr_earnings');
+          localStorage.removeItem('educator_transactions');
+          localStorage.removeItem('educator_purchases');
+
           setCookie('user', response.data.token, 7);
           setCookie('walletAddress', activeWallet, 7);
-          const trimmedName = username.trim();
+          const finalName = response.data.data?.locked_account_name || response.data.data?.name || trimmedInput;
           localStorage.setItem('user', response.data.data?.id || '');
           localStorage.setItem('role', 'student');
-          localStorage.setItem('username', trimmedName);
-          localStorage.setItem('studentName', trimmedName);
-          localStorage.setItem('name', trimmedName);
+          localStorage.setItem('username', finalName);
+          localStorage.setItem('studentName', finalName);
+          localStorage.setItem('name', finalName);
+          localStorage.setItem(`account_locked_name_v2_student_${activeWallet.toLowerCase()}`, finalName);
           if (activeWallet) {
-            localStorage.setItem(`student_name_${activeWallet.toLowerCase()}`, trimmedName);
+            localStorage.setItem(`student_name_${activeWallet.toLowerCase()}`, finalName);
           }
+          sessionStorage.setItem('session_user_logged_in', activeWallet.toLowerCase());
           setTimeout(() => navigate('/studenthome'), 800);
         } else {
           toast.error(response.data.error || 'Failed to save details');
@@ -96,7 +152,7 @@ const LoginPage = () => {
         const response = await axios.post(
           `${API_BASE_URL}/admin/add-details`,
           {
-            username: username.trim(),
+            username: trimmedInput,
             wallet_id: activeWallet,
           },
           {
@@ -106,17 +162,32 @@ const LoginPage = () => {
 
         if (response.status === 200) {
           toast.success(response.data.message || 'Educator details added successfully!');
+          deleteCookie('user');
+          localStorage.removeItem('user');
+          localStorage.removeItem('studentName');
+          localStorage.removeItem('student_transactions');
+
           setCookie('admin', response.data.token, 7);
           setCookie('walletAddress', activeWallet, 7);
           setCookie('adminWallet', activeWallet, 7);
-          const trimmedName = username.trim();
+          const finalName = response.data.data?.locked_account_name || response.data.data?.name || trimmedInput;
           localStorage.setItem('admin', response.data.data?.id || '');
           localStorage.setItem('adminWallet', activeWallet);
           localStorage.setItem('educatorWallet', activeWallet);
           localStorage.setItem('role', 'educator');
-          localStorage.setItem('username', trimmedName);
-          localStorage.setItem('educatorName', trimmedName);
-          localStorage.setItem('name', trimmedName);
+          localStorage.setItem('username', finalName);
+          localStorage.setItem('educatorName', finalName);
+          localStorage.setItem('name', finalName);
+          localStorage.setItem(`account_locked_name_v2_educator_${activeWallet.toLowerCase()}`, finalName);
+          const educatorBal = response.data.data?.inr_balance !== undefined ? response.data.data?.inr_balance : (response.data.data?.inr_earnings || 0);
+          localStorage.setItem('educator_inr_balance', String(educatorBal));
+          localStorage.setItem('educator_inr_earnings', String(response.data.data?.inr_earnings || 0));
+          try {
+            window.dispatchEvent(new CustomEvent('edusphere_balance_updated', {
+              detail: { balance: educatorBal, isEducator: true }
+            }));
+          } catch (e) {}
+          sessionStorage.setItem('session_educator_logged_in', activeWallet.toLowerCase());
           setTimeout(() => navigate('/educatorhome'), 800);
         } else {
           toast.error(response.data.error || 'Failed to save details');
@@ -272,6 +343,10 @@ const LoginPage = () => {
                   required
                 />
               </div>
+              <p className="mt-2 text-xs text-amber-500/90 dark:text-amber-400/90 font-medium flex items-center gap-1.5">
+                <FiShield className="text-amber-400 shrink-0" />
+                <span>Right Correct username to save and continue</span>
+              </p>
             </div>
 
             <motion.button

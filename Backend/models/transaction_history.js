@@ -13,6 +13,16 @@ const TransactionSchema = new mongoose.Schema({
         default: ""
     },
 
+    account_role: {
+        type: String,
+        default: "student"
+    },
+
+    role: {
+        type: String,
+        default: "Student"
+    },
+
     educator_name: {
         type: String,
         default: ""

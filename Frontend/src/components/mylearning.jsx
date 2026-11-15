@@ -1,5 +1,6 @@
+import ThreeLineMenu from "./ThreeLineMenu";
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiChevronRight, FiClock, FiBookOpen, FiUploadCloud, FiCopy, FiDollarSign, FiBook, FiGift, FiUser } from 'react-icons/fi';
 import { useTheme } from "next-themes";
@@ -38,33 +39,100 @@ const MyLearningPage = () => {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const token = getCookie("user");
-        if (!token) {
+        const token = getCookie("admin") || getCookie("user");
+        const role = localStorage.getItem("role");
+        const isEducator = role === "educator";
+        const wallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem(isEducator ? "adminWallet" : "studentWallet") || localStorage.getItem("educatorWallet") || "";
+        const studentName = isEducator
+          ? (localStorage.getItem("educatorName") || localStorage.getItem("name") || (localStorage.getItem("role") === "educator" ? localStorage.getItem("username") : "") || "")
+          : (localStorage.getItem("studentName") || localStorage.getItem("name") || (localStorage.getItem("role") === "student" ? localStorage.getItem("username") : "") || "");
+
+        if (!token && !wallet && !studentName) {
           purchasedCourses([]);
           completedCourse([]);
           return;
         }
 
-        const response = await axios.get(`${API_BASE_URL}/user/my-learning`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            }
+        let allCatalogCourses = [];
+        try {
+          const catRes = await axios.get(`${API_BASE_URL}/courses`);
+          if (catRes.data && Array.isArray(catRes.data.courses)) {
+            allCatalogCourses = catRes.data.courses;
           }
-        );
+        } catch (e) {}
 
+        const response = await axios.get(`${API_BASE_URL}/user/my-learning`, {
+          params: {
+            wallet: wallet || undefined,
+            student_name: studentName || undefined
+          },
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+
+        let enrolled = [];
         if (response.status === 200 && response.data) {
-          completedCourse(response.data.courses_completed || []);
-          purchasedCourses(response.data.courses_enrolled || []);
+          enrolled = response.data.courses_enrolled || [];
+          const done = response.data.courses_completed || [];
+          completedCourse(done);
+
+          // If backend returned empty for student, clean obsolete local keys
+          if (!isEducator && enrolled.length === 0) {
+            try {
+              localStorage.removeItem("enrolled_courses");
+              if (wallet) {
+                Object.keys(localStorage).forEach(k => {
+                  if (k.startsWith(`enrolled_${wallet.toLowerCase()}_`)) {
+                    localStorage.removeItem(k);
+                  }
+                });
+              }
+            } catch (e) {}
+          }
+        }
+
+        // Web3 Permanent Access: Also merge any locally preserved enrollments for educator
+        if (isEducator) {
+          try {
+            const localEnrolledIds = JSON.parse(localStorage.getItem("enrolled_courses") || "[]");
+            const existingIds = new Set(enrolled.map(c => String(c._id || c.title)));
+            allCatalogCourses.forEach(c => {
+              if (c && (localEnrolledIds.includes(c._id) || (wallet && localStorage.getItem(`enrolled_${wallet.toLowerCase()}_${c._id}`) === "true"))) {
+                if (!existingIds.has(String(c._id)) && !existingIds.has(String(c.title))) {
+                  enrolled.push(c);
+                  existingIds.add(String(c._id));
+                }
+              }
+            });
+          } catch (e) {}
+        }
+
+        // Ensure student retains lifetime access to all purchased/enrolled courses even if deleted by author
+        if (!isEducator) {
+          enrolled = enrolled.filter(c =>
+            c &&
+            c._id !== '6af89d7ae927a30c7d237d38' &&
+            !(c.title && c.title.toLowerCase().trim() === 'java') &&
+            c._id !== '6af8a5116732461498652ae6' &&
+            !(c.title && (c.title.toLowerCase().includes('c++') || c.title.toLowerCase().includes('cpp')))
+          );
+        }
+        purchasedCourses(enrolled);
+        if (wallet || studentName) {
+          localStorage.setItem(`student_enrolled_courses_${(wallet || studentName).toLowerCase()}`, JSON.stringify(enrolled));
         }
       } catch (error) {
         console.warn('Failed to fetch courses:', error);
+        if (wallet || studentName) {
+          try {
+            const cached = JSON.parse(localStorage.getItem(`student_enrolled_courses_${(wallet || studentName).toLowerCase()}`) || "[]");
+            if (cached.length > 0) purchasedCourses(cached);
+          } catch (e) {}
+        }
       }
     };
 
     fetchCourses();
-  }, []);
+  }, [walletAddress]);
 
   const handleWalletClick = () => {
     console.log("Wallet Address:", walletAddress);
@@ -130,12 +198,6 @@ const MyLearningPage = () => {
             'bg-gray-800 border border-gray-700' :
             'bg-white border border-gray-200'
           }`}>
-          <Link to="/signup">
-            <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-opacity-10 hover:bg-white">
-              <MdOutlineLibraryAdd className="text-xl" />
-              Add Details
-            </button>
-          </Link>
           <Link to="/coins">
             <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-opacity-10 hover:bg-white">
               <RiCoinsLine className="text-xl" />
@@ -207,13 +269,24 @@ const MyLearningPage = () => {
               Courses
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link
-              to="/contest"
-              className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
-            >
-              Contest
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
-            </Link>
+            {!isEducator && (
+              <Link
+                to="/my-test-marks"
+                className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
+              >
+                Test Review
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
+              </Link>
+            )}
+            {!isEducator && (
+              <Link
+                to="/contest"
+                className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
+              >
+                Contest
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
+              </Link>
+            )}
           </div>
 
           {/* Wallet Button */}
@@ -252,62 +325,7 @@ const MyLearningPage = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className={`text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full ${walletAddress ? "" : "cursor-not-allowed opacity-50"
-                }`}
-              disabled={!walletAddress}
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && walletAddress && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-lg ${isDarkMode
-                      ? "bg-gray-800/95 border border-gray-700"
-                      : "bg-white/95 border border-amber-100"
-                    } z-50`}
-                >
-                  <div className="p-2 space-y-1">
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiUser className="text-amber-500" />
-                      <span>Add Details</span>
-                    </Link>
-                    
-                    <Link
-                      to="/transaction"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiDollarSign className="text-amber-300" />
-                      <span>Transactions</span>
-                    </Link>
-                    <Link
-                      to="/mylearning"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-300" />
-                      <span>My Learning</span>
-                    </Link>
-                    <Link
-                      to="/redeem"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiGift className="text-amber-300" />
-                      <span>Redeem</span>
-                    </Link>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ThreeLineMenu isEducator={isEducator} isDarkMode={isDarkMode} />
         </div>
       </nav>
       <div className="border-b-4 border-gold"></div>

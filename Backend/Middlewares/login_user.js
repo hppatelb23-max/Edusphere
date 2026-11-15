@@ -91,6 +91,12 @@ async function optional_login_user(req, res, next) {
             const decoded = getuser(token);
             if (decoded && decoded.id) {
                 req.user = await Users.findById(decoded.id);
+                if (!req.user) {
+                    req.user = await Admins.findById(decoded.id);
+                    if (req.user) {
+                        req.userRole = "educator";
+                    }
+                }
             }
         } catch (e) {
             // Ignore error and proceed

@@ -30,6 +30,7 @@ import CreateTest from './components/tests/CreateTest.jsx';
 import EducatorMarks from './components/tests/EducatorMarks.jsx';
 import MyTestMarks from './components/tests/MyTestMarks.jsx';
 import AdminPayments from './components/AdminPayments.jsx';
+import IncompleteTestModal from './components/tests/IncompleteTestModal.jsx';
 
 
 const ProtectedRoute = ({ element }) => {
@@ -47,6 +48,7 @@ const App = () => {
           <ThemeProvider>
             <CourseProvider>
               <Router>
+                <IncompleteTestModal />
                 <Routes>
                   {/* Routes accessible to everyone */}
                   <Route path="/" element={<Edusphere />} />

@@ -26,6 +26,7 @@ import {
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
 import { useThemeStore } from "../../store/themeStore";
+import ThreeLineMenu from "../ThreeLineMenu";
 import { useTheme } from "next-themes";
 import {
   fetchEducatorSubmissions,
@@ -72,14 +73,15 @@ const EducatorMarks = () => {
     }
   }, [testTitleParam]);
 
-  const handleOpenRecording = async (sub) => {
-    setRecordingModalSub(sub);
+  const handleOpenRecording = async (sub, targetRecId = null, partLabel = "") => {
+    const recId = targetRecId || sub.recording_id_part2 || sub.recording_id_part1 || sub.recording_id;
+    setRecordingModalSub({ ...sub, activeRecId: recId, activePartLabel: partLabel });
     setRecordingLoading(true);
     setRecordingBlobUrl(null);
 
     try {
-      if (sub.recording_id) {
-        const record = await getProctorRecording(sub.recording_id);
+      if (recId) {
+        const record = await getProctorRecording(recId);
         if (record && record.blob) {
           const url = URL.createObjectURL(record.blob);
           setRecordingBlobUrl(url);
@@ -267,7 +269,38 @@ const EducatorMarks = () => {
     setSearchParams({});
   };
 
-  const filteredSubmissions = submissions.filter((sub) => {
+  // Deduplicate submissions so marks & recordings never appear twice
+  const uniqueSubmissions = React.useMemo(() => {
+    const seenSubIds = new Set();
+    const seenRecIds = new Set();
+    const seenComposite = new Set();
+    const result = [];
+
+    (submissions || []).forEach((s) => {
+      if (!s) return;
+      const subId = String(s.submission_id || s._id || "").trim();
+      const recId = s.recording_id ? String(s.recording_id).trim() : "";
+      const testId = String(s.test_id || s.test_title || "").trim();
+      const studentWallet = String(s.student_wallet_id || "").toLowerCase().trim();
+      const studentName = String(s.student_name || "").toLowerCase().trim();
+      const score = String(s.score_percentage ?? "");
+      const timeBucket = Math.floor(new Date(s.submitted_at || Date.now()).getTime() / 180000);
+      const compositeKey = `${testId}_${studentWallet || studentName}_${score}_${timeBucket}`;
+
+      if (subId && seenSubIds.has(subId)) return;
+      if (recId && seenRecIds.has(recId)) return;
+      if (compositeKey && seenComposite.has(compositeKey)) return;
+
+      if (subId) seenSubIds.add(subId);
+      if (recId) seenRecIds.add(recId);
+      if (compositeKey) seenComposite.add(compositeKey);
+      result.push(s);
+    });
+
+    return result;
+  }, [submissions]);
+
+  const filteredSubmissions = uniqueSubmissions.filter((sub) => {
     const matchesSearch =
       (sub.student_wallet_id && sub.student_wallet_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (sub.student_name && sub.student_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -376,6 +409,9 @@ const EducatorMarks = () => {
           >
             {isDarkMode ? "🌙" : "☀️"}
           </button>
+
+          {/* Unified Three-Line Menu */}
+          <ThreeLineMenu isEducator={true} isDarkMode={isDarkMode} />
         </div>
       </nav>
 
@@ -678,14 +714,35 @@ const EducatorMarks = () => {
                           <span>Review Mistakes</span>
                         </button>
 
-                        <button
-                          onClick={() => handleOpenRecording(sub)}
-                          className="px-4 py-2.5 rounded-xl font-bold text-xs bg-purple-500/20 border border-purple-400/40 text-purple-300 hover:bg-purple-500 hover:text-black transition-all flex items-center gap-1.5 shadow-sm shadow-purple-500/20"
-                          title="Watch candidate proctored webcam recording (Educator only)"
-                        >
-                          <FiVideo className="w-4 h-4" />
-                          <span>Watch Recording</span>
-                        </button>
+                        {sub.recording_id_part1 && sub.recording_id_part2 ? (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              onClick={() => handleOpenRecording(sub, sub.recording_id_part1, "Part 1 (Before Tab Close / Shutdown)")}
+                              className="px-3 py-2 rounded-xl font-bold text-[11px] bg-purple-500/20 border border-purple-400/50 text-purple-300 hover:bg-purple-500 hover:text-black transition-all flex items-center gap-1.5 shadow-sm"
+                              title="Watch proctor recording before student closed the tab or device shut down"
+                            >
+                              <FiVideo className="w-3.5 h-3.5 text-amber-400" />
+                              <span>📹 Part 1 (Before Close)</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenRecording(sub, sub.recording_id_part2, "Part 2 (After Resumption / Final)")}
+                              className="px-3 py-2 rounded-xl font-bold text-[11px] bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 hover:bg-emerald-500 hover:text-black transition-all flex items-center gap-1.5 shadow-sm"
+                              title="Watch proctor recording after student resumed the test"
+                            >
+                              <FiVideo className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>📹 Part 2 (After Resumed)</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleOpenRecording(sub, sub.recording_id_part2 || sub.recording_id_part1 || sub.recording_id, "Complete Session")}
+                            className="px-4 py-2.5 rounded-xl font-bold text-xs bg-purple-500/20 border border-purple-400/40 text-purple-300 hover:bg-purple-500 hover:text-black transition-all flex items-center gap-1.5 shadow-sm shadow-purple-500/20"
+                            title="Watch candidate proctored webcam recording (Educator only)"
+                          >
+                            <FiVideo className="w-4 h-4" />
+                            <span>Watch Recording</span>
+                          </button>
+                        )}
 
                         <button
                           onClick={() => handleDeleteSubmission(sub)}
@@ -744,6 +801,40 @@ const EducatorMarks = () => {
                   ✕
                 </button>
               </div>
+
+              {/* Segment Switcher if both recordings exist */}
+              {recordingModalSub.recording_id_part1 && recordingModalSub.recording_id_part2 && (
+                <div className="flex flex-wrap items-center gap-2 mb-4 p-2.5 rounded-xl bg-purple-950/30 border border-purple-500/30">
+                  <span className="text-xs font-bold text-gray-300">Select Recording Segment:</span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRecording(recordingModalSub, recordingModalSub.recording_id_part1, "Part 1 (Before Tab Close / Shutdown)")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      recordingModalSub.activeRecId === recordingModalSub.recording_id_part1
+                        ? "bg-purple-500 text-black shadow-md shadow-purple-500/30"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    📹 Part 1 (Before Tab Close)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenRecording(recordingModalSub, recordingModalSub.recording_id_part2, "Part 2 (After Resumption / Final)")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      recordingModalSub.activeRecId === recordingModalSub.recording_id_part2
+                        ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/30"
+                        : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                    }`}
+                  >
+                    📹 Part 2 (After Resumption)
+                  </button>
+                  {recordingModalSub.activePartLabel && (
+                    <span className="text-[11px] font-mono font-bold text-amber-400 ml-auto">
+                      Playing: {recordingModalSub.activePartLabel}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Video Player Section */}
               <div className="mb-6 rounded-2xl overflow-hidden bg-black border border-gray-800 shadow-2xl relative min-h-[260px] flex items-center justify-center">
@@ -810,7 +901,7 @@ const EducatorMarks = () => {
                   {recordingBlobUrl && (
                     <a
                       href={recordingBlobUrl}
-                      download={`proctor_recording_${recordingModalSub.test_id || "exam"}.webm`}
+                      download={`proctor_recording_${recordingModalSub.test_id || "exam"}_${recordingModalSub.activeRecId?.includes("part1") ? "part1_before_close" : recordingModalSub.activeRecId?.includes("part2") ? "part2_after_resumption" : "session"}.webm`}
                       className="px-5 py-2.5 rounded-xl text-xs font-bold bg-purple-500 hover:bg-purple-400 text-black flex items-center gap-2 transition-all shadow-md shadow-purple-500/20"
                     >
                       <FiDownload className="w-4 h-4" />
@@ -889,6 +980,7 @@ const EducatorMarks = () => {
                     const optionLetters = ["A", "B", "C", "D", "E", "F"];
                     const optionsList = Array.isArray(item.options) ? item.options : [];
 
+                    // Normalize indices reliably (supports numbers, numeric strings, letters, option text)
                     const resolveOptIdx = (val) => {
                       if (val === undefined || val === null || val === -1 || val === "-1") return -1;
                       if (typeof val === "number" && !isNaN(val)) return val;
@@ -900,15 +992,38 @@ const EducatorMarks = () => {
                       return found !== -1 ? found : -1;
                     };
 
-                    const correctOptIdx = resolveOptIdx(item.correct_option);
-                    const selectedOptIdx = resolveOptIdx(item.selected_option);
+                    let correctOptIdx = resolveOptIdx(item.correct_option);
+                    let selectedOptIdx = resolveOptIdx(item.selected_option);
+
+                    if (selectedOptIdx === -1 && item.selected_option_text) {
+                      const textMatch = optionsList.findIndex(
+                        (o) => String(o).trim().toLowerCase() === String(item.selected_option_text).trim().toLowerCase()
+                      );
+                      if (textMatch !== -1) selectedOptIdx = textMatch;
+                    }
+
+                    if (item.is_correct && selectedOptIdx === -1 && correctOptIdx !== -1) {
+                      selectedOptIdx = correctOptIdx;
+                    }
+
+                    const isTextIdentical =
+                      selectedOptIdx !== -1 &&
+                      correctOptIdx !== -1 &&
+                      optionsList[selectedOptIdx] &&
+                      optionsList[correctOptIdx] &&
+                      String(optionsList[selectedOptIdx]).trim().toLowerCase() ===
+                        String(optionsList[correctOptIdx]).trim().toLowerCase();
 
                     const isCorrect =
-                      correctOptIdx !== -1 && selectedOptIdx !== -1
-                        ? correctOptIdx === selectedOptIdx
-                        : Boolean(item.is_correct);
+                      Boolean(item.is_correct) ||
+                      (correctOptIdx !== -1 && selectedOptIdx !== -1 && correctOptIdx === selectedOptIdx) ||
+                      isTextIdentical;
 
-                    const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : "None";
+                    if (isCorrect && selectedOptIdx === -1 && correctOptIdx !== -1) {
+                      selectedOptIdx = correctOptIdx;
+                    }
+
+                    const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : null;
                     const studentAnsText = selectedOptIdx !== -1 && optionsList[selectedOptIdx] ? optionsList[selectedOptIdx] : "";
                     const correctOptLetter = correctOptIdx !== -1 ? optionLetters[correctOptIdx] : "A";
                     const correctAnsText = correctOptIdx !== -1 && optionsList[correctOptIdx] ? optionsList[correctOptIdx] : "";
@@ -919,20 +1034,20 @@ const EducatorMarks = () => {
                         className={`p-5 rounded-2xl border transition-all ${
                           isCorrect
                             ? isDarkMode
-                              ? "bg-emerald-950/20 border-emerald-500/40 shadow-sm"
-                              : "bg-emerald-50/70 border-emerald-300 shadow-sm"
+                              ? "bg-emerald-950/20 border-emerald-500/50 shadow-md shadow-emerald-500/10"
+                              : "bg-emerald-50/80 border-emerald-400 shadow-md shadow-emerald-500/10"
                             : isDarkMode
-                            ? "bg-red-950/25 border-red-500/40 shadow-sm"
-                            : "bg-red-50/70 border-red-300 shadow-sm"
+                            ? "bg-red-950/25 border-red-500/50 shadow-md shadow-red-500/10"
+                            : "bg-red-50/80 border-red-300 shadow-md shadow-red-500/10"
                         }`}
                       >
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-bold text-gray-400 uppercase">Question {idx + 1}</span>
                           <span
-                            className={`text-xs px-3 py-1 rounded-full font-extrabold flex items-center gap-1.5 border shadow-sm ${
+                            className={`text-xs px-3.5 py-1.5 rounded-full font-black flex items-center gap-1.5 border shadow-sm ${
                               isCorrect
-                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
-                                : "bg-red-500/20 text-red-400 border-red-500/50"
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/60"
+                                : "bg-red-500/20 text-red-300 border-red-500/60"
                             }`}
                           >
                             {isCorrect ? (
@@ -949,20 +1064,31 @@ const EducatorMarks = () => {
                           </span>
                         </div>
 
-                        {/* Wrong Answer Warning Banner - Explaining candidate's mistake and highlighting correct solution */}
-                        {!isCorrect && (
-                          <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                            <div className="flex items-center gap-2 text-red-300">
-                              <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                        {/* Answer Banner: Green for Correct, Red+Green for Wrong */}
+                        {isCorrect ? (
+                          <div className="p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-500/50 text-xs mb-3 flex items-center gap-2 text-emerald-300 w-full">
+                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-black text-[11px] shrink-0">
+                              ✓
+                            </span>
+                            <span className="leading-relaxed break-words">
+                              <strong>Candidate Choice:</strong> {studentOptLetter ? `Option ${studentOptLetter} (${studentAnsText})` : (studentAnsText || `Option ${correctOptLetter}`)} <span className="font-extrabold text-emerald-400">(✓ Correct Solution)</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-3 flex flex-col gap-2.5 w-full">
+                            <div className="flex items-start gap-2 text-red-300">
+                              <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
                                 ✗
                               </span>
-                              <span>
-                                <strong>Candidate Choice:</strong> Option {studentOptLetter}{studentAnsText ? ` (${studentAnsText})` : ""} <span className="font-extrabold text-red-400">(Incorrect)</span>
+                              <span className="leading-relaxed break-words">
+                                <strong>Candidate Choice:</strong> {studentOptLetter ? `Option ${studentOptLetter} (${studentAnsText})` : <span className="text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30">Not Answered / Skipped</span>} <span className="font-extrabold text-red-400">(Incorrect)</span>
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 self-start sm:self-auto bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-extrabold shrink-0">
-                              <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Correct Solution: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}</span>
+                            <div className="flex items-start gap-2 bg-emerald-950/80 p-3 rounded-xl border border-emerald-500/40 text-emerald-300 font-bold w-full leading-relaxed">
+                              <FiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                              <span className="break-words">
+                                Correct Solution: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}
+                              </span>
                             </div>
                           </div>
                         )}

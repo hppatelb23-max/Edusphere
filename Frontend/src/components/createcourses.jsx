@@ -12,6 +12,7 @@ import { useWriteContract, useAccount } from 'wagmi'
 import { CourseContext, CourseProvider } from "./context1"
 import { toast, ToastContainer } from "react-toastify"
 import { API_BASE_URL, getCookie } from "../utils/api";
+import ThreeLineMenu from "./ThreeLineMenu";
 
 const CreateCourse = () => {
   const navigate = useNavigate();
@@ -167,7 +168,7 @@ const CreateCourse = () => {
 
     const adminToken = getCookie('admin');
     if (!adminToken) {
-      toast.error('Educator session not found. Please click "Add Details" in the menu to register as an Educator.');
+      toast.error('Educator session not found. Please register as an Educator first.');
       setTimeout(() => navigate('/signup'), 1200);
       return;
     }
@@ -225,6 +226,9 @@ const CreateCourse = () => {
       const priceInr = Number(formData.price_inr) || 0;
       const priceEth = Number(formData.price_eth) || 0;
 
+      const activeWallet = walletAddress || localStorage.getItem('walletAddress') || localStorage.getItem('adminWallet') || localStorage.getItem('educatorWallet') || getCookie('walletAddress') || '';
+      const activeAuthorName = localStorage.getItem('educatorName') || localStorage.getItem('name') || localStorage.getItem('username') || '';
+
       const courseData = {
         title: formData.title.trim(),
         description: formData.description.trim(),
@@ -237,17 +241,22 @@ const CreateCourse = () => {
         category: categoryList.length > 0 ? categoryList : ['General'],
         image_hash: uploadedFiles.image,
         video_hash: uploadedFiles.videos,
-        author_wallet_id: walletAddress,
+        author_wallet_id: activeWallet,
+        author_name: activeAuthorName,
       };
 
       // Persist educator wallet
-      localStorage.setItem('adminWallet', walletAddress);
-      localStorage.setItem('educatorWallet', walletAddress);
+      if (activeWallet) {
+        localStorage.setItem('adminWallet', activeWallet);
+        localStorage.setItem('educatorWallet', activeWallet);
+        localStorage.setItem('walletAddress', activeWallet);
+      }
 
       const response = await axios.post(`${API_BASE_URL}/courses`, courseData, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${adminToken}`,
+          ...(activeWallet ? { 'x-wallet-address': activeWallet } : {})
         }
       });
 
@@ -286,6 +295,32 @@ const CreateCourse = () => {
           });
         } catch (addErr) {
           console.warn('Error linking course to admin list:', addErr);
+        }
+
+        // Persist newly published course locally as well
+        try {
+          const publishedCourse = response.data.course;
+          const course_id = publishedCourse?._id;
+          const allCustomRaw = localStorage.getItem('edusphere_custom_courses') || '[]';
+          const allCustom = JSON.parse(allCustomRaw);
+          const filteredAll = allCustom.filter(c => c && (c._id !== course_id && c.title !== publishedCourse?.title));
+          filteredAll.unshift(publishedCourse);
+          localStorage.setItem('edusphere_custom_courses', JSON.stringify(filteredAll));
+
+          if (activeWallet) {
+            const myCoursesRaw = localStorage.getItem(`educator_courses_${activeWallet.toLowerCase()}`) || '[]';
+            const myCourses = JSON.parse(myCoursesRaw);
+            const filteredMy = myCourses.filter(c => c && (c._id !== course_id && c.title !== publishedCourse?.title));
+            filteredMy.unshift(publishedCourse);
+            localStorage.setItem(`educator_courses_${activeWallet.toLowerCase()}`, JSON.stringify(filteredMy));
+          }
+
+          // Un-delete from local deleted set if it was previously deleted
+          const delRaw = localStorage.getItem('deleted_course_ids') || '[]';
+          const delList = JSON.parse(delRaw).filter(id => id !== course_id && id !== publishedCourse?.title);
+          localStorage.setItem('deleted_course_ids', JSON.stringify(delList));
+        } catch (storageErr) {
+          console.warn('Local course persistence warning:', storageErr);
         }
 
         toast.success(response.data.message || 'Course published successfully!');
@@ -446,50 +481,7 @@ const CreateCourse = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className={`text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full ${walletAddress ? "" : "cursor-not-allowed opacity-50"
-                }`}
-              disabled={!walletAddress}
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && walletAddress && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-lg ${isDarkMode
-                    ? "bg-gray-800/95 border border-gray-700"
-                    : "bg-white/95 border border-amber-100"
-                    } z-50`}
-                >
-                  <div className="p-2 space-y-1">
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiUser className="text-amber-500" />
-                      <span>Add Details</span>
-                    </Link>
-                    
-                    
-                    <Link
-                      to="/managecourses"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Manage Courses</span>
-                    </Link>
-                    
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ThreeLineMenu isEducator={true} isDarkMode={isDarkMode} />
         </div>
       </nav>
       <div className="border-b-4 border-gold"></div>
@@ -591,34 +583,7 @@ const CreateCourse = () => {
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  {/* Indian Rupees Price Input */}
-                  <div className="relative">
-                    <label className="block text-xs font-semibold text-emerald-400 mb-1.5">
-                      🇮🇳 Price in Indian Rupees (₹ INR)
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        step="any"
-                        id="price_inr"
-                        name="price_inr"
-                        value={formData.price_inr}
-                        onChange={handleInputChange}
-                        className="w-full pl-10 pr-4 py-3 bg-transparent border dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition-all font-mono text-sm"
-                        placeholder="e.g. 500 or 1"
-                      />
-                      <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                        <span className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-black text-xs">
-                          ₹
-                        </span>
-                      </div>
-                    </div>
-                    <span className="text-[11px] text-gray-400 block mt-1">
-                      Exact fee for students paying via UPI QR (Minimum legal UPI bank transfer in India is ₹1.00)
-                    </span>
-                  </div>
-
-                  {/* Ethereum Price Input */}
+                  {/* Ethereum Price Input (FIRST) */}
                   <div className="relative">
                     <label className="block text-xs font-semibold text-amber-400 mb-1.5">
                       ⟠ Price in Ethereum (ETH)
@@ -642,6 +607,33 @@ const CreateCourse = () => {
                     </div>
                     <span className="text-[11px] text-gray-400 block mt-1">
                       Exact fee for students paying with Web3 / MetaMask
+                    </span>
+                  </div>
+
+                  {/* Indian Rupees / UPI Price Input (SECOND) */}
+                  <div className="relative">
+                    <label className="block text-xs font-semibold text-emerald-400 mb-1.5">
+                      🇮🇳 Price in Indian Rupees / UPI (₹ INR)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="any"
+                        id="price_inr"
+                        name="price_inr"
+                        value={formData.price_inr}
+                        onChange={handleInputChange}
+                        className="w-full pl-10 pr-4 py-3 bg-transparent border dark:border-gray-700 rounded-lg focus:ring-2 focus:ring-emerald-400 outline-none transition-all font-mono text-sm"
+                        placeholder="e.g. 500 or 1"
+                      />
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                        <span className="w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center font-bold text-black text-xs">
+                          ₹
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-gray-400 block mt-1">
+                      Exact fee for students paying via Indian Rupees / UPI
                     </span>
                   </div>
                 </div>

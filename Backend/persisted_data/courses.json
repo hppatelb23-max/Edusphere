@@ -1,0 +1,408 @@
+[
+  {
+    "_id": "6af86744730cb9221f3c0f65",
+    "__v": 0,
+    "author_name": "Dr. Alex Rivera",
+    "author_wallet_id": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+    "buy_count": 142,
+    "category": [
+      "Web3",
+      "Solidity",
+      "Ethereum"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?auto=format&fit=crop&w=800&q=80",
+    "course_points": 250,
+    "course_price": 0.08,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.123Z",
+    "currency": "DUAL",
+    "description": "Master smart contract development using Solidity, Hardhat, Ethers.js, and Wagmi. Build production-grade decentralized applications from scratch.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Full-Stack Web3 & Smart Contract Engineering",
+    "updatedAt": "2026-11-15T12:44:38.123Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f66",
+    "__v": 0,
+    "author_name": "Elena Rostova",
+    "author_wallet_id": "0x3C44CdD45969428583546463b6080B65f2557596",
+    "buy_count": 98,
+    "category": [
+      "DeFi",
+      "Finance",
+      "Crypto"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1621416894569-0f39ed31d247?auto=format&fit=crop&w=800&q=80",
+    "course_points": 300,
+    "course_price": 0.12,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.339Z",
+    "currency": "DUAL",
+    "description": "Deep dive into Automated Market Makers (AMMs), yield farming, liquidity pools, flash loans, and staking mechanics on Ethereum and Layer 2s.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Decentralized Finance (DeFi) Protocol Architecture",
+    "updatedAt": "2026-11-15T12:44:38.339Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f67",
+    "__v": 0,
+    "author_name": "Marcus Chen",
+    "author_wallet_id": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+    "buy_count": 215,
+    "category": [
+      "Frontend",
+      "React",
+      "JavaScript"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&w=800&q=80",
+    "course_points": 200,
+    "course_price": 0.05,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.369Z",
+    "currency": "DUAL",
+    "description": "Learn server components, streaming SSR, modern custom hooks, state management, and high-performance frontend engineering.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Modern React 19 & Next.js 15 Masterclass",
+    "updatedAt": "2026-11-15T12:44:38.369Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f68",
+    "__v": 0,
+    "author_name": "Dr. Sophia Vance",
+    "author_wallet_id": "0x15d34AA54267DB7D7c367839AAf71A00a2C6A65E",
+    "buy_count": 310,
+    "category": [
+      "AI & ML",
+      "Python",
+      "Data Science"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=800&q=80",
+    "course_points": 400,
+    "course_price": 0.15,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.460Z",
+    "currency": "DUAL",
+    "description": "Build neural networks, train transformers, explore computer vision, and deploy cutting-edge AI models to production scalable systems.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Artificial Intelligence & Deep Learning with PyTorch",
+    "updatedAt": "2026-11-15T12:44:38.460Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f69",
+    "__v": 0,
+    "author_name": "Vikram Patel",
+    "author_wallet_id": "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc",
+    "buy_count": 176,
+    "category": [
+      "Security",
+      "Solidity",
+      "Audit"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1563986768609-322da13575f3?auto=format&fit=crop&w=800&q=80",
+    "course_points": 500,
+    "course_price": 0.2,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.478Z",
+    "currency": "DUAL",
+    "description": "Identify reentrancy attacks, integer overflows, access control bugs, and front-running risks using Slither, Echidna, and Foundry.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Smart Contract Auditing & Security Vulnerabilities",
+    "updatedAt": "2026-11-15T12:44:38.478Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f6a",
+    "__v": 0,
+    "author_name": "Satoshi Dev",
+    "author_wallet_id": "0x976EA74026E72CD555567505E93A2e1ad40E6263",
+    "buy_count": 89,
+    "category": [
+      "Cryptography",
+      "ZKP",
+      "Layer 2"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80",
+    "course_points": 600,
+    "course_price": 0.25,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.502Z",
+    "currency": "DUAL",
+    "description": "Explore Circom, zk-SNARKs, Groth16, and rollup scaling architectures powering next-generation privacy-preserving blockchains.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Zero-Knowledge Proofs & zkEVM Cryptography",
+    "updatedAt": "2026-11-15T12:44:38.502Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f6b",
+    "__v": 0,
+    "author_name": "Lucas Meyer",
+    "author_wallet_id": "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f",
+    "buy_count": 165,
+    "category": [
+      "Rust",
+      "Solana",
+      "Systems"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&w=800&q=80",
+    "course_points": 350,
+    "course_price": 0.1,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.511Z",
+    "currency": "DUAL",
+    "description": "Write lightning-fast, memory-safe programs in Rust. Build decentralized applications and smart contracts on Solana using Anchor.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "Rust Programming for Solana & Systems Engineering",
+    "updatedAt": "2026-11-15T12:44:38.511Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af86744730cb9221f3c0f6c",
+    "__v": 0,
+    "author_name": "Sarah Jenkins",
+    "author_wallet_id": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+    "buy_count": 113,
+    "category": [
+      "Governance",
+      "DAO",
+      "Web3"
+    ],
+    "course_image": "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=800&q=80",
+    "course_points": 180,
+    "course_price": 0.06,
+    "course_video": [
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.522Z",
+    "currency": "DUAL",
+    "description": "Design decentralized autonomous organizations with Snapshot voting, multi-sig treasuries, tokenomics, and governance execution.",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0,
+    "price_inr": 0,
+    "title": "DAO Architecture & Governance Protocol Design",
+    "updatedAt": "2026-11-15T12:44:38.522Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af89d21e927a30c7d237d1f",
+    "__v": 2,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 0,
+    "category": [
+      "Coding"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794678049048_Python.jpg",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794678049311_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.530Z",
+    "currency": "DUAL",
+    "description": "Python",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0.0001,
+    "price_inr": 200,
+    "title": "Python",
+    "updatedAt": "2026-11-15T12:44:38.530Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af8a5116732461498652ae6",
+    "__v": 6,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 1,
+    "category": [
+      "Coding"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794723872113_C__.jpg",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794723872339_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.549Z",
+    "currency": "DUAL",
+    "description": "C++",
+    "is_deleted_by_author": true,
+    "is_delisted": true,
+    "price_eth": 0.0001,
+    "price_inr": 100,
+    "title": "C++",
+    "updatedAt": "2026-11-15T12:44:38.549Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af8bf836a30331d8e045060",
+    "__v": 0,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 0,
+    "category": [
+      "Coding"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794686851549_Java-Logo.png",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794686851767_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.557Z",
+    "currency": "DUAL",
+    "description": "Java",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0.0001,
+    "price_inr": 400,
+    "title": "Java",
+    "updatedAt": "2026-11-15T12:44:38.557Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af95095599083b58342eda7",
+    "__v": 1,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 1,
+    "category": [
+      "Query Language"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794744854871_sql.png",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794744855322_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.564Z",
+    "currency": "DUAL",
+    "description": "SQL",
+    "is_deleted_by_author": true,
+    "is_delisted": true,
+    "price_eth": 0.0001,
+    "price_inr": 300,
+    "title": "SQL",
+    "updatedAt": "2026-11-15T12:44:38.564Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af960ec8799e60c2e219685",
+    "__v": 2,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 1,
+    "category": [
+      "Coding"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794728171878_images.jpg",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794728172273_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.574Z",
+    "currency": "DUAL",
+    "description": "JAVASCRIPT",
+    "is_deleted_by_author": false,
+    "is_delisted": false,
+    "price_eth": 0.0001,
+    "price_inr": 100,
+    "title": "JAVASCRIPT",
+    "updatedAt": "2026-11-15T12:44:38.574Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af961468799e60c2e2196b8",
+    "__v": 0,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 1,
+    "category": [
+      "Coding"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794728262314_what-is-css.png",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794728262628_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.583Z",
+    "currency": "DUAL",
+    "description": "CSS",
+    "is_deleted_by_author": true,
+    "is_delisted": true,
+    "price_eth": 0.0001,
+    "price_inr": 75,
+    "title": "CSS",
+    "updatedAt": "2026-11-15T12:47:53.278Z",
+    "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af9a1bc891ef4a4a792e93b",
+    "__v": 3,
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "buy_count": 1,
+    "category": [
+      "Coding"
+    ],
+    "course_image": "http://localhost:5000/uploads/1794746765683_html.jpg",
+    "course_points": 100,
+    "course_price": 0.0001,
+    "course_video": [
+      "http://localhost:5000/uploads/1794746765940_Edusphere_Python_in_30_Seconds.mp4"
+    ],
+    "createdAt": "2026-11-15T12:44:38.590Z",
+    "currency": "DUAL",
+    "description": "HTML",
+    "is_deleted_by_author": true,
+    "is_delisted": true,
+    "price_eth": 0.0001,
+    "price_inr": 400,
+    "title": "HTML",
+    "updatedAt": "2026-11-15T12:47:50.587Z",
+    "upi_id": "9969170089@upi"
+  }
+]

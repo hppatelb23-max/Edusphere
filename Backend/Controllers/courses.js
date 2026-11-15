@@ -1,5 +1,6 @@
 const Courses = require("../models/course_schema");
 const Admins = require("../models/admin_schema");
+const { persistModel } = require("../utils/persistence");
 const fs = require("fs");
 const path = require("path");
 
@@ -114,6 +115,7 @@ async function seedDefaultCoursesIfEmpty() {
                 author_wallet_id: adminWallet || c.author_wallet_id
             }));
             await Courses.insertMany(coursesToInsert);
+            await persistModel('courses', Courses);
             console.log("Seeded default catalog courses into database.");
         }
     } catch (e) {
@@ -132,7 +134,7 @@ async function DisplayCourses(req, res) {
         const uniqueCourses = [];
 
         allCourses.forEach(c => {
-            if (!c) return;
+            if (!c || c.is_delisted || c.is_deleted_by_author) return;
             const sid = c._id.toString();
             const normTitle = (c.title || "").toLowerCase().trim();
             if (!seenIds.has(sid) && (!normTitle || !seenTitles.has(normTitle))) {
@@ -161,9 +163,27 @@ async function UploadCourse(req, res) {
             return res.status(400).json({ error: "Please fill all fields." });
         }
 
-        const admin = await Admins.findById(req.user._id);
-        const resolvedWallet = admin?.metamask_wallet_id || author_wallet_id;
-        const resolvedName = admin?.admin_name || "Educator";
+        let admin = null;
+        if (req.user && req.user._id) {
+            admin = await Admins.findById(req.user._id);
+        }
+        if (!admin && author_wallet_id) {
+            admin = await Admins.findOne({ metamask_wallet_id: { $regex: new RegExp(`^${author_wallet_id}$`, "i") } });
+        }
+        if (!admin && req.body.author_name) {
+            admin = await Admins.findOne({
+                $or: [
+                    { admin_name: { $regex: new RegExp(`^${req.body.author_name}$`, "i") } },
+                    { locked_account_name: { $regex: new RegExp(`^${req.body.author_name}$`, "i") } }
+                ]
+            });
+        }
+        if (!admin) {
+            admin = await Admins.findOne();
+        }
+
+        const resolvedWallet = author_wallet_id || admin?.metamask_wallet_id || req.headers["x-wallet-address"] || "";
+        const resolvedName = admin?.admin_name || admin?.locked_account_name || req.body.author_name || "Educator";
 
         if (!resolvedWallet) {
             return res.status(400).json({ error: "No MetaMask wallet found for this educator." });
@@ -179,14 +199,31 @@ async function UploadCourse(req, res) {
         const numericPrice = resolvedPriceEth > 0 ? resolvedPriceEth : (Number(price) || 0.05);
         const chosenCurrency = currency || "DUAL";
 
-        // Prevent duplicate creation of identical course
+        // Prevent duplicate creation of identical course / un-delete if previously delisted
         const existingCourse = await Courses.findOne({
             title: title.trim(),
-            author_wallet_id: resolvedWallet
+            $or: [
+                { author_wallet_id: { $regex: new RegExp(`^${resolvedWallet}$`, "i") } },
+                { author_name: { $regex: new RegExp(`^${resolvedName}$`, "i") } }
+            ]
         });
 
         let course = existingCourse;
-        if (!course) {
+        if (course) {
+            course.is_delisted = false;
+            course.is_deleted_by_author = false;
+            course.description = description;
+            course.category = Array.isArray(category) ? category : [category || "General"];
+            course.author_name = resolvedName;
+            course.author_wallet_id = resolvedWallet;
+            course.course_price = numericPrice;
+            course.currency = chosenCurrency;
+            course.price_inr = resolvedPriceInr;
+            course.price_eth = resolvedPriceEth;
+            course.course_image = image_hash;
+            course.course_video = Array.isArray(video_hash) ? video_hash : [video_hash];
+            await course.save();
+        } else {
             course = await Courses.create({
                 title: title.trim(),
                 description: description,
@@ -199,7 +236,9 @@ async function UploadCourse(req, res) {
                 price_eth: resolvedPriceEth,
                 upi_id: upi_id || "9969170089@upi",
                 course_image: image_hash,
-                course_video: Array.isArray(video_hash) ? video_hash : [video_hash]
+                course_video: Array.isArray(video_hash) ? video_hash : [video_hash],
+                is_delisted: false,
+                is_deleted_by_author: false
             });
         }
 
@@ -209,12 +248,17 @@ async function UploadCourse(req, res) {
 
         // Deduplicated addition to admin's courses_created
         if (admin) {
+            if (!admin.courses_created) admin.courses_created = [];
             const exists = admin.courses_created.some(cid => cid.toString() === course._id.toString());
             if (!exists) {
                 admin.courses_created.push(course._id);
                 await admin.save();
             }
         }
+
+        // Persist immediately to disk
+        await persistModel('courses', Courses);
+        await persistModel('admins', Admins);
 
         return res.status(200).json({ message: "Course uploaded successfully.", course: course });
     } catch (error) {

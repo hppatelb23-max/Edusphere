@@ -81,6 +81,8 @@ const HowItWorks = () => {
       roleIcon: <FiCpu className="w-4 h-4 text-amber-400" />,
       badgeColor: "bg-amber-500/20 text-amber-400 border-amber-400/40",
       image: "/images/kavyaimage.jpg",
+      imagePosition: "object-top",
+      style: { objectPosition: "center 0%" },
       college: "VJTI Mumbai",
       branch: "Computer Engineering",
       description: "Architecting Ethereum smart contracts, token standards, wallet integration, and immutable on-chain credential storage.",
@@ -93,6 +95,8 @@ const HowItWorks = () => {
       roleIcon: <FiLayout className="w-4 h-4 text-cyan-400" />,
       badgeColor: "bg-cyan-500/20 text-cyan-400 border-cyan-400/40",
       image: "/images/Pranit.jpeg",
+      imagePosition: "object-top",
+      style: { objectPosition: "center 0%" },
       college: "VJTI Mumbai",
       branch: "Computer Engineering",
       description: "Crafting fluid, accessible user interfaces, Web3 state interactions, responsive layouts, and interactive animations.",
@@ -105,6 +109,8 @@ const HowItWorks = () => {
       roleIcon: <FiCode className="w-4 h-4 text-emerald-400" />,
       badgeColor: "bg-emerald-500/20 text-emerald-400 border-emerald-400/40",
       image: "/images/Hitanshu.jpeg",
+      imagePosition: "object-top",
+      style: { objectPosition: "center 0%" },
       college: "VJTI Mumbai",
       branch: "Computer Engineering",
       description: "Building the proctored test facility engine, educator portals, anti-cheat mechanisms, and sleek theme experiences.",
@@ -117,6 +123,8 @@ const HowItWorks = () => {
       roleIcon: <FiServer className="w-4 h-4 text-purple-400" />,
       badgeColor: "bg-purple-500/20 text-purple-400 border-purple-400/40",
       image: "/images/harshimage.jpg",
+      imagePosition: "object-top",
+      style: { objectPosition: "center 0%" },
       college: "VJTI Mumbai",
       branch: "Computer Engineering",
       description: "Engineering scalable Express REST APIs, MongoDB schemas, grading logic, and secure authentication workflows.",
@@ -340,7 +348,8 @@ const HowItWorks = () => {
                         e.target.onerror = null;
                         e.target.src = "/images/Edusphere logo.png";
                       }}
-                      className="w-full h-full object-cover object-center rounded-xl transition-transform duration-300 hover:scale-105"
+                      className={`w-full h-full object-cover ${member.imagePosition || "object-top"} rounded-xl transition-transform duration-300 hover:scale-105`}
+                      style={member.style || { objectPosition: "center 0%" }}
                     />
                   </div>
 

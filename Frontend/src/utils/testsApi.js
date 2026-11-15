@@ -107,6 +107,9 @@ export const submitTestAnswers = async (submissionData) => {
         passed: res.data.result.passed,
         passing_score: res.data.result.passing_score,
         recording_id: submissionData.recording_id || res.data.result.recording_id || "",
+        recording_id_part1: submissionData.recording_id_part1 || res.data.result.recording_id_part1 || "",
+        recording_id_part2: submissionData.recording_id_part2 || res.data.result.recording_id_part2 || "",
+        has_interruption: Boolean(submissionData.has_interruption || submissionData.recording_id_part1),
         proctor_logs: submissionData.proctor_logs || res.data.result.proctor_logs || [],
         detailed_review: res.data.result.detailed_review
       });
@@ -123,6 +126,9 @@ export const submitTestAnswers = async (submissionData) => {
     const localResult = gradeTestSubmissionLocally(test, answers, student_wallet_id);
     // Enrich local result with recording and proctor logs
     localResult.recording_id = submissionData.recording_id || "";
+    localResult.recording_id_part1 = submissionData.recording_id_part1 || "";
+    localResult.recording_id_part2 = submissionData.recording_id_part2 || "";
+    localResult.has_interruption = Boolean(submissionData.has_interruption || submissionData.recording_id_part1);
     localResult.proctor_logs = submissionData.proctor_logs || [];
     localResult.student_name = submissionData.student_name || "";
     saveSubmissionLocally(localResult);
@@ -169,12 +175,15 @@ export const fetchMySubmissions = async (studentWallet, studentName) => {
     if (studentWallet) {
       const matchWallet =
         s.student_wallet_id && s.student_wallet_id.toLowerCase() === studentWallet.toLowerCase();
-      const matchGuest = s.student_wallet_id === "guest_student";
       const matchName =
         currentName &&
         s.student_name &&
         s.student_name.trim().toLowerCase() === currentName.trim().toLowerCase();
-      isMatch = matchWallet || matchGuest || matchName;
+      isMatch = matchWallet || matchName;
+    } else if (currentName) {
+      isMatch =
+        s.student_name &&
+        s.student_name.trim().toLowerCase() === currentName.trim().toLowerCase();
     }
 
     if (isMatch) {
@@ -183,27 +192,96 @@ export const fetchMySubmissions = async (studentWallet, studentName) => {
     }
   });
 
+  // Detect any scheduled assessments whose deadline has passed and student missed
+  try {
+    const allTests = await fetchAllTests();
+    const now = new Date();
+    const submittedTestIds = new Set(combined.map((s) => String(s.test_id)));
+
+    (allTests || []).forEach((t) => {
+      if (t.test_type === "scheduled" && t.schedule_end && new Date(t.schedule_end) < now) {
+        if (!submittedTestIds.has(String(t._id))) {
+          combined.push({
+            submission_id: `missed_${t._id}`,
+            test_id: t._id,
+            test_title: t.title,
+            author_name: t.author_name || "Faculty",
+            student_wallet_id: studentWallet || "",
+            student_name: currentName || "",
+            score_percentage: 0,
+            correct_answers: 0,
+            wrong_answers: 0,
+            total_questions: t.questions?.length || 0,
+            passed: false,
+            is_missed: true,
+            status: "Missed / Window Expired",
+            passing_score: t.passing_score || 60,
+            schedule_start: t.schedule_start,
+            schedule_end: t.schedule_end,
+            submitted_at: t.schedule_end,
+            detailed_review: []
+          });
+          submittedTestIds.add(String(t._id));
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("Error augmenting missed tests:", e);
+  }
+
   // Sort latest submissions first
   combined.sort((a, b) => new Date(b.submitted_at || 0) - new Date(a.submitted_at || 0));
   return combined;
 };
 
 export const fetchEducatorSubmissions = async (educatorWallet) => {
+  let backendSubmissions = [];
   try {
     const url = educatorWallet
       ? `${API_BASE_URL}/tests/submissions/all?educator_wallet=${educatorWallet}`
       : `${API_BASE_URL}/tests/submissions/all`;
-    const res = await axios.get(url, { timeout: 4000 });
-    if (res.data?.submissions && Array.isArray(res.data.submissions) && res.data.submissions.length > 0) {
-      // Merge with local submissions
-      const local = getStoredSubmissions();
-      const backendIds = new Set(res.data.submissions.map(s => s.submission_id || s._id));
-      return [...res.data.submissions, ...local.filter(s => !backendIds.has(s.submission_id))];
+    const res = await axios.get(url, { timeout: 5000 });
+    if (res.data?.submissions && Array.isArray(res.data.submissions)) {
+      backendSubmissions = res.data.submissions;
     }
   } catch (err) {
     console.warn("Backend submissions failed, loading local gradebook:", err.message);
   }
-  return getStoredSubmissions();
+
+  // Merge with local submissions, strictly deduplicating so records NEVER appear twice
+  const local = getStoredSubmissions();
+  const seenSubIds = new Set();
+  const seenRecIds = new Set();
+  const seenComposite = new Set();
+  const deduplicated = [];
+
+  const addUnique = (s) => {
+    if (!s) return;
+    const subId = String(s.submission_id || s._id || "").trim();
+    const recId = s.recording_id ? String(s.recording_id).trim() : "";
+    const testId = String(s.test_id || s.test_title || "").trim();
+    const studentWallet = String(s.student_wallet_id || "").toLowerCase().trim();
+    const studentName = String(s.student_name || "").toLowerCase().trim();
+    const score = String(s.score_percentage ?? "");
+    const timeBucket = Math.floor(new Date(s.submitted_at || Date.now()).getTime() / 180000);
+    const compositeKey = `${testId}_${studentWallet || studentName}_${score}_${timeBucket}`;
+
+    if (subId && seenSubIds.has(subId)) return;
+    if (recId && seenRecIds.has(recId)) return;
+    if (compositeKey && seenComposite.has(compositeKey)) return;
+
+    if (subId) seenSubIds.add(subId);
+    if (recId) seenRecIds.add(recId);
+    if (compositeKey) seenComposite.add(compositeKey);
+    deduplicated.push(s);
+  };
+
+  // Process backend submissions first (authoritative)
+  backendSubmissions.forEach(addUnique);
+  // Then merge any purely offline local submissions
+  local.forEach(addUnique);
+
+  return deduplicated;
 };
 
 

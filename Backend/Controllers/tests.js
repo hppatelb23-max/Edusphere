@@ -1,5 +1,6 @@
 const Users = require("../models/user_schema");
 const Tests = require("../models/test_schema");
+const { persistModel } = require("../utils/persistence");
 
 const defaultSampleTests = [
     {
@@ -281,6 +282,7 @@ async function seedDefaultTestsIfEmpty() {
         if (count === 0) {
             console.log("Seeding default question banks and tests...");
             await Tests.insertMany(defaultSampleTests);
+            await persistModel('tests', Tests);
             console.log("Successfully seeded default tests.");
         }
     } catch (err) {
@@ -362,6 +364,9 @@ async function CreateTest(req, res) {
             category,
             difficulty,
             duration_minutes,
+            test_type,
+            schedule_start,
+            schedule_end,
             passing_score,
             pick_random_count,
             author_wallet_id,
@@ -391,18 +396,41 @@ async function CreateTest(req, res) {
             }
         }
 
+        const isScheduled = test_type === "scheduled";
+        let parsedStart = null;
+        let parsedEnd = null;
+
+        if (isScheduled) {
+            if (!schedule_start || !schedule_end) {
+                return res.status(400).json({ error: "Please provide both start and end time for scheduled assessments." });
+            }
+            parsedStart = new Date(schedule_start);
+            parsedEnd = new Date(schedule_end);
+            if (isNaN(parsedStart.getTime()) || isNaN(parsedEnd.getTime())) {
+                return res.status(400).json({ error: "Invalid schedule start or end time format." });
+            }
+            if (parsedEnd <= parsedStart) {
+                return res.status(400).json({ error: "Schedule end time must be after the start time." });
+            }
+        }
+
         const newTest = await Tests.create({
             title: title.trim(),
             description: description.trim(),
             category: Array.isArray(category) ? category : [category || "General"],
             difficulty: difficulty || "Intermediate",
             duration_minutes: Number(duration_minutes) || 15,
+            test_type: isScheduled ? "scheduled" : "normal",
+            schedule_start: parsedStart,
+            schedule_end: parsedEnd,
             passing_score: Number(passing_score) || 60,
             pick_random_count: Math.min(Number(pick_random_count) || questions.length, questions.length),
             author_wallet_id: author_wallet_id,
             author_name: author_name || "Educator",
             questions: questions
         });
+
+        await persistModel('tests', Tests);
 
         return res.status(201).json({
             message: "Test created successfully!",
@@ -416,7 +444,7 @@ async function CreateTest(req, res) {
 // POST /tests/submit
 async function SubmitTest(req, res) {
     try {
-        const { test_id, student_wallet_id, student_name, answers, recording_id, proctor_logs } = req.body;
+        const { test_id, student_wallet_id, student_name, answers, recording_id, recording_id_part1, recording_id_part2, has_interruption, proctor_logs } = req.body;
         let resolvedStudentName = (student_name || '').trim();
         if (!resolvedStudentName && student_wallet_id) {
             try {
@@ -429,9 +457,32 @@ async function SubmitTest(req, res) {
             return res.status(400).json({ error: 'Missing required test submission parameters.' });
         }
 
-        const test = await Tests.findById(test_id);
+        const mongoose = require("mongoose");
+        let test = null;
+        if (mongoose.Types.ObjectId.isValid(test_id)) {
+            try {
+                test = await Tests.findById(test_id);
+            } catch (e) {}
+        }
+        if (!test) {
+            test = await Tests.findOne({
+                $or: [
+                    { _id: test_id },
+                    { title: new RegExp('^' + String(test_id).replace(/[-_]/g, ' ') + '$', 'i') }
+                ]
+            });
+        }
         if (!test) {
             return res.status(404).json({ error: 'Test not found.' });
+        }
+
+        // Validate scheduled window if test is scheduled
+        if (test.test_type === "scheduled" && test.schedule_end) {
+            const now = new Date();
+            const endBuffer = new Date(new Date(test.schedule_end).getTime() + 2 * 60 * 1000);
+            if (now > endBuffer) {
+                return res.status(403).json({ error: "The scheduled window for this test has ended. Submissions are no longer accepted." });
+            }
         }
 
         // Helper to normalize option index from number, numeric string, letter ('A','B'...), or option text
@@ -453,7 +504,6 @@ async function SubmitTest(req, res) {
         let correctCount = 0;
         const totalQuestions = answers.length;
         const detailedReview = [];
-        const mongoose = require("mongoose");
 
         answers.forEach((ans, ansIdx) => {
             let originalQ = null;
@@ -478,20 +528,38 @@ async function SubmitTest(req, res) {
             if (originalQ) {
                 const optionsList = Array.isArray(originalQ.options) ? originalQ.options : [];
                 const correctOptIdx = normalizeOptionIndex(originalQ.correct_option, optionsList);
-                const selectedOptIdx = normalizeOptionIndex(ans.selected_option, optionsList);
+                let selectedOptIdx = normalizeOptionIndex(ans.selected_option, optionsList);
+
+                // Check text matching if selected_option_text provided or selectedOptIdx not found
+                if (selectedOptIdx === -1 && ans.selected_option_text) {
+                    const textMatch = optionsList.findIndex(o =>
+                        String(o).trim().toLowerCase() === String(ans.selected_option_text).trim().toLowerCase()
+                    );
+                    if (textMatch !== -1) selectedOptIdx = textMatch;
+                }
 
                 let isCorrect = false;
                 if (correctOptIdx !== -1 && selectedOptIdx !== -1) {
                     isCorrect = (correctOptIdx === selectedOptIdx);
-                } else if (optionsList.length > 0) {
+                }
+                if (!isCorrect && optionsList.length > 0) {
                     const correctText = String(optionsList[correctOptIdx] || originalQ.correct_option || "").trim().toLowerCase();
-                    const selectedText = String(optionsList[selectedOptIdx] || ans.selected_option || "").trim().toLowerCase();
+                    const selectedText = String(
+                        optionsList[selectedOptIdx] ||
+                        ans.selected_option_text ||
+                        (typeof ans.selected_option === "string" ? ans.selected_option : "") ||
+                        ""
+                    ).trim().toLowerCase();
                     if (correctText && selectedText && correctText === selectedText) {
                         isCorrect = true;
+                        if (selectedOptIdx === -1) selectedOptIdx = correctOptIdx;
                     }
                 }
 
-                if (isCorrect) correctCount++;
+                if (isCorrect) {
+                    correctCount++;
+                    if (selectedOptIdx === -1) selectedOptIdx = correctOptIdx;
+                }
 
                 detailedReview.push({
                     question_id: originalQ._id || ans.question_id,
@@ -500,6 +568,7 @@ async function SubmitTest(req, res) {
                     options: optionsList,
                     option_images: originalQ.option_images || [],
                     selected_option: selectedOptIdx,
+                    selected_option_text: (selectedOptIdx >= 0 && optionsList[selectedOptIdx]) ? optionsList[selectedOptIdx] : (ans.selected_option_text || ""),
                     correct_option: correctOptIdx !== -1 ? correctOptIdx : 0,
                     is_correct: isCorrect,
                     explanation: originalQ.explanation || ""
@@ -520,15 +589,45 @@ async function SubmitTest(req, res) {
             wrong_answers: totalQuestions - correctCount,
             total_questions: totalQuestions,
             passed: passed,
-            recording_id: recording_id || "",
+            recording_id: recording_id || recording_id_part2 || recording_id_part1 || "",
+            recording_id_part1: recording_id_part1 || "",
+            recording_id_part2: recording_id_part2 || "",
+            has_interruption: Boolean(has_interruption || recording_id_part1),
             proctor_logs: Array.isArray(proctor_logs) ? proctor_logs : [],
             submitted_at: new Date(),
             answers: detailedReview
         });
 
+        // Award 50 coins if student scored >= passing score
+        let coinsAwarded = 0;
+        let newCoinBalance = null;
+        if (passed) {
+            coinsAwarded = 50;
+            try {
+                const Users = require("../models/user_schema");
+                let u = null;
+                if (student_wallet_id) {
+                    u = await Users.findOne({ metamask_wallet_id: new RegExp('^' + student_wallet_id + '$', 'i') });
+                }
+                if (!u && resolvedStudentName) {
+                    u = await Users.findOne({ user_name: new RegExp('^' + resolvedStudentName + '$', 'i') });
+                }
+                if (u) {
+                    u.coins = (u.coins || 500) + 50;
+                    await u.save();
+                    newCoinBalance = u.coins;
+                }
+            } catch (coinErr) {
+                console.warn("Could not increment user coins in db:", coinErr);
+            }
+        }
+
         // Increment attempts count
         test.attempts_count = (test.attempts_count || 0) + 1;
         await test.save();
+
+        await persistModel('tests', Tests);
+        await persistModel('users', Users);
 
         return res.status(200).json({
             message: "Test evaluated successfully.",
@@ -541,7 +640,12 @@ async function SubmitTest(req, res) {
                 score_percentage: scorePercentage,
                 passing_score: test.passing_score || 60,
                 passed: passed,
-                recording_id: recording_id || "",
+                coins_awarded: coinsAwarded,
+                coin_balance: newCoinBalance,
+                recording_id: recording_id || recording_id_part2 || recording_id_part1 || "",
+                recording_id_part1: recording_id_part1 || "",
+                recording_id_part2: recording_id_part2 || "",
+                has_interruption: Boolean(has_interruption || recording_id_part1),
                 proctor_logs: Array.isArray(proctor_logs) ? proctor_logs : [],
                 detailed_review: detailedReview
             }
@@ -588,6 +692,9 @@ async function GetEducatorSubmissions(req, res) {
                         passed: sub.passed,
                         passing_score: t.passing_score,
                         recording_id: sub.recording_id || "",
+                        recording_id_part1: sub.recording_id_part1 || "",
+                        recording_id_part2: sub.recording_id_part2 || "",
+                        has_interruption: Boolean(sub.has_interruption || sub.recording_id_part1),
                         proctor_logs: sub.proctor_logs || [],
                         submitted_at: sub.submitted_at,
                         answers: sub.answers,
@@ -656,6 +763,50 @@ async function GetMySubmissions(req, res) {
             }
         });
 
+        // Detect missed scheduled assessments where window has ended and student did not attempt
+        try {
+            const now = new Date();
+            const allScheduledTests = await Tests.find({
+                test_type: "scheduled",
+                schedule_end: { $lt: now }
+            }).select("title author_name passing_score schedule_start schedule_end submissions");
+
+            const submittedTestIds = new Set(mySubmissions.map(s => String(s.test_id)));
+
+            allScheduledTests.forEach(st => {
+                if (!submittedTestIds.has(String(st._id))) {
+                    const hasSub = (st.submissions || []).some(sub =>
+                        (student_wallet && sub.student_wallet_id && sub.student_wallet_id.toLowerCase() === student_wallet.toLowerCase()) ||
+                        (student_name && sub.student_name && sub.student_name.toLowerCase() === student_name.toLowerCase())
+                    );
+                    if (!hasSub) {
+                        mySubmissions.push({
+                            submission_id: `missed_${st._id}`,
+                            test_id: st._id,
+                            test_title: st.title,
+                            author_name: st.author_name || "Faculty",
+                            student_wallet_id: student_wallet || "",
+                            student_name: student_name || "",
+                            score_percentage: 0,
+                            correct_answers: 0,
+                            wrong_answers: 0,
+                            total_questions: 0,
+                            passed: false,
+                            is_missed: true,
+                            status: "Missed / Expired",
+                            passing_score: st.passing_score,
+                            schedule_start: st.schedule_start,
+                            schedule_end: st.schedule_end,
+                            submitted_at: st.schedule_end,
+                            detailed_review: []
+                        });
+                    }
+                }
+            });
+        } catch (e) {
+            console.warn("Error calculating missed tests:", e);
+        }
+
         mySubmissions.sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at));
 
         return res.status(200).json({
@@ -681,6 +832,7 @@ async function DeleteTest(req, res) {
                 console.warn("DeleteTest custom ID fallback notice:", innerErr.message);
             }
         }
+        await persistModel('tests', Tests);
         return res.status(200).json({ message: "Test deleted successfully." });
     } catch (err) {
         return res.status(500).json({ error: "Error deleting test: " + err.message });
@@ -697,6 +849,8 @@ async function DeleteSubmission(req, res) {
             { "submissions._id": submission_id },
             { $pull: { submissions: { _id: submission_id } } }
         );
+
+        await persistModel('tests', Tests);
 
         return res.status(200).json({ message: "Student marks record deleted successfully." });
     } catch (err) {

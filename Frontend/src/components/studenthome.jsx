@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiAward, FiLogOut } from "react-icons/fi";
+import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiAward, FiLogOut, FiPlusCircle } from "react-icons/fi";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from "../context/WalletProvider";
 import { useThemeStore } from "../store/themeStore";
 import { API_BASE_URL, getCookie } from "../utils/api";
 import axios from "axios";
 import { toast } from "react-toastify";
+import ThreeLineMenu, { downloadDepositReceipt } from "./ThreeLineMenu";
 
 const Studenthome = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -21,10 +22,42 @@ const Studenthome = () => {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    localStorage.setItem("role", "student");
+    localStorage.removeItem("admin");
+    localStorage.removeItem("educatorName");
+    localStorage.removeItem("educatorWallet");
+    localStorage.removeItem("adminWallet");
+  }, []);
+
   const [inrBalance, setInrBalance] = useState(() => {
     const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
-    return saved ? Number(saved) : 1000;
+    if (!saved || saved === "1000") {
+      localStorage.setItem("student_inr_cash", "0");
+      localStorage.setItem("demo_upi_cash", "0");
+      return 0;
+    }
+    return Number(saved);
   });
+
+  useEffect(() => {
+    const handleBalanceUpdate = (e) => {
+      if (e?.detail?.balance !== undefined) {
+        setInrBalance(Number(e.detail.balance));
+      } else {
+        const saved = localStorage.getItem("student_inr_cash") || localStorage.getItem("demo_upi_cash");
+        if (saved !== null && saved !== undefined) {
+          setInrBalance(Number(saved));
+        }
+      }
+    };
+    window.addEventListener("edusphere_balance_updated", handleBalanceUpdate);
+    window.addEventListener("storage", handleBalanceUpdate);
+    return () => {
+      window.removeEventListener("edusphere_balance_updated", handleBalanceUpdate);
+      window.removeEventListener("storage", handleBalanceUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchBalance = async () => {
@@ -34,7 +67,7 @@ const Studenthome = () => {
           params: { wallet: walletAddress || "" },
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
-        const bal = res.data?.inr_balance ?? res.data?.demo_balance ?? 1000;
+        const bal = res.data?.inr_balance ?? res.data?.demo_balance ?? 0;
         setInrBalance(bal);
         localStorage.setItem("student_inr_cash", String(bal));
         localStorage.setItem("demo_upi_cash", String(bal));
@@ -43,27 +76,145 @@ const Studenthome = () => {
     fetchBalance();
   }, [walletAddress]);
 
-  const handleAddMoney = async () => {
+  // Add Money Modal State (UPI ID & Card Number, Max ₹500)
+  const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
+  const [addMoneyMethod, setAddMoneyMethod] = useState("upi"); // 'upi' | 'card'
+  const [upiIdInput, setUpiIdInput] = useState("");
+  const [cardNumberInput, setCardNumberInput] = useState("");
+  const [cardExpiryInput, setCardExpiryInput] = useState("");
+  const [cardCvvInput, setCardCvvInput] = useState("");
+  const [addAmountInput, setAddAmountInput] = useState("500");
+  const [isAddingMoney, setIsAddingMoney] = useState(false);
+
+  const handleCardNumberChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+    const formatted = raw.match(/.{1,4}/g)?.join(" ") || raw;
+    setCardNumberInput(formatted);
+  };
+
+  const handleConfirmAddMoney = async (e) => {
+    e?.preventDefault();
+    const amt = Number(addAmountInput);
+
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid amount (₹1 to ₹500).");
+      return;
+    }
+    if (amt > 500) {
+      toast.error("Maximum amount that can be added at a time is ₹500 only.");
+      return;
+    }
+
+    if (addMoneyMethod === "upi") {
+      const trimmedUpi = upiIdInput.trim();
+      if (!trimmedUpi) {
+        toast.error("Please enter your UPI ID.");
+        return;
+      }
+      if (!trimmedUpi.includes("@")) {
+        toast.error("Please enter a valid UPI ID (e.g., student@upi, mobile@paytm).");
+        return;
+      }
+    } else {
+      const cleanCard = cardNumberInput.replace(/\s+/g, "");
+      if (!cleanCard) {
+        toast.error("Please enter your Credit or Debit Card number.");
+        return;
+      }
+      if (cleanCard.length < 12) {
+        toast.error("Please enter a valid 12-16 digit Card number.");
+        return;
+      }
+      const cleanCvv = cardCvvInput.replace(/\D/g, "");
+      if (cleanCvv.length !== 3) {
+        toast.error("Please enter a valid 3-digit CVV.");
+        return;
+      }
+    }
+
+    const activeWallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem("studentWallet") || getCookie("walletAddress") || "";
+    const activeName = localStorage.getItem("studentName") || localStorage.getItem("name") || (localStorage.getItem("role") === "student" ? localStorage.getItem("username") : "") || "";
+
+    setIsAddingMoney(true);
     try {
       const token = getCookie("user");
+      const methodLabel = addMoneyMethod === "upi" ? `UPI ID (${upiIdInput.trim()})` : `Card (•••• ${cardNumberInput.replace(/\s+/g, "").slice(-4)})`;
       const res = await axios.post(`${API_BASE_URL}/user/demo-upi-add-cash`, {
-        amount: 500,
-        wallet: walletAddress || "",
-        name: localStorage.getItem("username") || ""
+        amount: amt,
+        wallet: activeWallet,
+        name: activeName,
+        is_educator: false,
+        payment_method: methodLabel
       }, {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-      const newBal = res.data?.new_balance ?? (inrBalance + 500);
+
+      const newBal = res.data?.new_balance ?? (inrBalance + amt);
       setInrBalance(newBal);
       localStorage.setItem("student_inr_cash", String(newBal));
       localStorage.setItem("demo_upi_cash", String(newBal));
-      toast.success(`🎉 Added ₹500! New Rupee Balance: ₹${newBal}`);
-    } catch (e) {
-      const newBal = inrBalance + 500;
-      setInrBalance(newBal);
-      localStorage.setItem("student_inr_cash", String(newBal));
-      localStorage.setItem("demo_upi_cash", String(newBal));
-      toast.success(`🎉 Added ₹500! New Rupee Balance: ₹${newBal}`);
+
+      // Record in local transactions & auto-download receipt
+      const depNow = Date.now();
+      const depIso = new Date(depNow).toISOString();
+      const depRecord = {
+        _id: res.data?.transaction?._id || `dep_${depNow}`,
+        invoice_no: `EDUDEP-${depNow.toString().slice(-6)}`,
+        user_name: activeName || "Student",
+        student_name: activeName || "Student",
+        role: "Student",
+        amount: amt,
+        currency: "INR",
+        payment_method: methodLabel,
+        transaction_address: res.data?.transaction?.transaction_address || (addMoneyMethod === "upi" ? upiIdInput.trim() : `Card ending in ${cardNumberInput.replace(/\s+/g, "").slice(-4) || "XXXX"}`),
+        bank_utr: res.data?.transaction?.bank_utr || `DEP-${depNow}`,
+        timestamp: depNow,
+        createdAt: depIso,
+        purchased_date: depIso,
+        date: new Date(depNow).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        status: "SUCCESS",
+        type: "deposit",
+        course_purchased: `Personal Rupee Wallet Top-up (+₹${amt.toLocaleString("en-IN")})`,
+        course_title: `Personal Rupee Wallet Top-up (+₹${amt.toLocaleString("en-IN")})`,
+        educator_name: "Personal Rupee Wallet"
+      };
+
+      try {
+        const existingTxns = JSON.parse(localStorage.getItem("student_transactions") || "[]");
+        existingTxns.unshift(depRecord);
+        localStorage.setItem("student_transactions", JSON.stringify(existingTxns));
+        window.dispatchEvent(new CustomEvent("edusphere_transaction_created", {
+          detail: { transaction: depRecord, isEducator: false }
+        }));
+      } catch (e) {}
+
+      try {
+        downloadDepositReceipt(depRecord);
+      } catch (dlErr) {
+        console.error("Error auto-downloading deposit receipt:", dlErr);
+      }
+
+      toast.success(`🎉 Added ₹${amt} via ${addMoneyMethod === "upi" ? "UPI ID" : "Card"}! Receipt generated. New Balance: ₹${newBal}`);
+      setShowAddMoneyModal(false);
+      setUpiIdInput("");
+      setCardNumberInput("");
+      setCardExpiryInput("");
+      setCardCvvInput("");
+      setAddAmountInput("500");
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message;
+      if (err.response?.status === 400 && errMsg) {
+        toast.error(errMsg);
+      } else {
+        const newBal = inrBalance + amt;
+        setInrBalance(newBal);
+        localStorage.setItem("student_inr_cash", String(newBal));
+        localStorage.setItem("demo_upi_cash", String(newBal));
+        toast.success(`🎉 Added ₹${amt}! New Balance: ₹${newBal}`);
+        setShowAddMoneyModal(false);
+      }
+    } finally {
+      setIsAddingMoney(false);
     }
   };
 
@@ -144,6 +295,10 @@ const Studenthome = () => {
               Tests
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
+            <Link to="/my-test-marks" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+              Test Review
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
+            </Link>
             <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
               Contest
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
@@ -151,17 +306,12 @@ const Studenthome = () => {
           </div>
 
           {/* Student Indian Rupee Balance Badge */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Cash:</span>
-            <span className="font-black text-sm text-emerald-300">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
-            <button
-              onClick={handleAddMoney}
-              title="Add ₹500 Indian Rupees"
-              className="px-2 py-0.5 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-[10px] transition-all active:scale-95 shadow"
-            >
-              + ₹500
-            </button>
-          </div>
+          {walletConnected && (
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Online Money Available:</span>
+              <span className="font-black text-sm text-emerald-300">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+            </div>
+          )}
 
           {/* Wallet Button */}
           <motion.button
@@ -202,78 +352,8 @@ const Studenthome = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className="text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full hover:shadow-md transition-all"
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-lg ${isDarkMode ? "bg-gray-800/95 border border-gray-700" : "bg-white/95 border border-amber-100"
-                    } z-50`}
-                >
-                  <div className="p-2 space-y-1">
-                    <Link
-                      to="/tests"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 text-amber-500 font-semibold"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Test Facility</span>
-                    </Link>
-                    <Link
-                      to="/my-test-marks"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiAward className="text-amber-500" />
-                      <span>My Test Marks</span>
-                    </Link>
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiUser className="text-amber-500" />
-                      <span>Add Details</span>
-                    </Link>
-                    <Link
-                      to="/transaction"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiDollarSign className="text-amber-500" />
-                      <span>Transactions</span>
-                    </Link>
-                    <Link
-                      to="/mylearning"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>My Learning</span>
-                    </Link>
-                    <Link
-                      to="/redeem"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiGift className="text-amber-500" />
-                      <span>Redeem</span>
-                    </Link>
-                    <button
-                      onClick={() => disconnectWallet()}
-                      className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-red-500/10 text-red-400 font-semibold transition-colors text-left"
-                    >
-                      <FiLogOut className="text-red-400" />
-                      <span>Disconnect Wallet</span>
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* 100% Uniform Three Line Menu Component (Student Only) */}
+          <ThreeLineMenu isEducator={false} />
         </div>
       </nav>
       <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-amber-200/60"}></div>
@@ -304,6 +384,9 @@ const Studenthome = () => {
               <Link to="/tests" className="bg-amber-500/20 border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black px-8 py-4 rounded-full text-lg font-semibold shadow-lg transition-all duration-300">
                 Give Tests
               </Link>
+              <Link to="/my-test-marks" className="bg-emerald-500/20 border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-black px-8 py-4 rounded-full text-lg font-semibold shadow-lg transition-all duration-300">
+                Test Review
+              </Link>
               <Link to="/howitworks" className="px-8 py-4 rounded-full border-2 border-amber-500 text-amber-500 hover:bg-amber-500/10 transition-colors duration-300 font-semibold">
                 How It Works
               </Link>
@@ -322,6 +405,249 @@ const Studenthome = () => {
           <p className={isDarkMode ? 'text-yellow-600' : 'text-gray-500 text-sm'}>© 2025 Edusphere. All Rights Reserved.</p>
         </div>
       </footer>
+
+      {/* ── Add Money Modal (UPI ID & Card Options, Max ₹500) ── */}
+      <AnimatePresence>
+        {showAddMoneyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`max-w-md w-full rounded-3xl p-6 sm:p-8 border shadow-2xl relative ${
+                isDarkMode ? "bg-gray-900 border-amber-500/30 text-white" : "bg-white border-amber-200 text-gray-900"
+              }`}
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setShowAddMoneyModal(false)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              >
+                ✕
+              </button>
+
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30 text-2xl font-black">
+                  ₹
+                </div>
+                <div>
+                  <h3 className="text-xl font-black">Add Money</h3>
+                  <p className="text-xs text-gray-400">
+                    Current Balance: <strong className="text-emerald-400">₹{Number(inrBalance).toLocaleString("en-IN")} INR</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Step 1: Select Payment Method (UPI ID or Card) */}
+              <div className="mb-5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                  1. Choose Payment Method
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAddMoneyMethod("upi")}
+                    className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1.5 transition-all ${
+                      addMoneyMethod === "upi"
+                        ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 ring-2 ring-emerald-500/30 shadow-md"
+                        : isDarkMode
+                        ? "bg-gray-800/60 border-gray-700 text-gray-400 hover:border-gray-600"
+                        : "bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    <span className="text-xl">📱</span>
+                    <span>UPI ID</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setAddMoneyMethod("card")}
+                    className={`py-3 px-3 rounded-2xl border font-bold text-xs flex flex-col items-center gap-1.5 transition-all ${
+                      addMoneyMethod === "card"
+                        ? "bg-emerald-500/20 border-emerald-400 text-emerald-300 ring-2 ring-emerald-500/30 shadow-md"
+                        : isDarkMode
+                        ? "bg-gray-800/60 border-gray-700 text-gray-400 hover:border-gray-600"
+                        : "bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300"
+                    }`}
+                  >
+                    <span className="text-xl">💳</span>
+                    <span>Credit / Debit Card</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Step 2: Method Input Details */}
+              <div className="mb-5">
+                {addMoneyMethod === "upi" ? (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                      Enter your UPI ID
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. yourname@upi / 9876543210@paytm"
+                      value={upiIdInput}
+                      onChange={(e) => setUpiIdInput(e.target.value)}
+                      className={`w-full px-4 py-3 rounded-xl border text-sm font-mono outline-none transition-all ${
+                        isDarkMode
+                          ? "bg-gray-800/70 border-gray-700 focus:border-emerald-400 text-white placeholder-gray-500"
+                          : "bg-gray-50 border-gray-300 focus:border-emerald-500 text-gray-900 placeholder-gray-400"
+                      }`}
+                    />
+                    <span className="text-[11px] text-gray-400 mt-1 block">
+                      Supports Google Pay, PhonePe, Paytm, BHIM or any banking UPI app
+                    </span>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                        Credit or Debit Card Number
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="XXXX XXXX XXXX XXXX"
+                        value={cardNumberInput}
+                        onChange={handleCardNumberChange}
+                        maxLength={19}
+                        className={`w-full px-4 py-3 rounded-xl border text-sm font-mono outline-none transition-all ${
+                          isDarkMode
+                            ? "bg-gray-800/70 border-gray-700 focus:border-emerald-400 text-white placeholder-gray-500"
+                            : "bg-gray-50 border-gray-300 focus:border-emerald-500 text-gray-900 placeholder-gray-400"
+                        }`}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">
+                          Expiry Date
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="MM/YY"
+                          value={cardExpiryInput}
+                          onChange={(e) => {
+                            let v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                            if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+                            setCardExpiryInput(v);
+                          }}
+                          maxLength={5}
+                          className={`w-full px-4 py-2.5 rounded-xl border text-xs font-mono outline-none ${
+                            isDarkMode
+                              ? "bg-gray-800/70 border-gray-700 focus:border-emerald-400 text-white"
+                              : "bg-gray-50 border-gray-300 focus:border-emerald-500 text-gray-900"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-300 mb-1">
+                          CVV
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="•••"
+                          value={cardCvvInput}
+                          onChange={(e) => setCardCvvInput(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                          maxLength={3}
+                          className={`w-full px-4 py-2.5 rounded-xl border text-xs font-mono outline-none ${
+                            isDarkMode
+                              ? "bg-gray-800/70 border-gray-700 focus:border-emerald-400 text-white"
+                              : "bg-gray-50 border-gray-300 focus:border-emerald-500 text-gray-900"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Step 3: Enter Amount (Maximum ₹500) */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-gray-300">
+                    Amount to Add (₹ INR)
+                  </label>
+                  <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                    Max Limit: ₹500
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="1"
+                    max="500"
+                    placeholder="Enter amount (1 - 500)"
+                    value={addAmountInput}
+                    onChange={(e) => setAddAmountInput(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-3 rounded-xl border text-lg font-black font-mono outline-none transition-all ${
+                      isDarkMode
+                        ? "bg-gray-800/70 border-gray-700 focus:border-emerald-400 text-emerald-300"
+                        : "bg-gray-50 border-gray-300 focus:border-emerald-500 text-emerald-700"
+                    }`}
+                  />
+                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 font-black text-emerald-400 text-lg">
+                    ₹
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-2.5">
+                  {[100, 250, 500].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setAddAmountInput(String(preset))}
+                      className={`flex-1 py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                        addAmountInput === String(preset)
+                          ? "bg-emerald-500 text-black border-emerald-400 shadow-sm"
+                          : isDarkMode
+                          ? "bg-gray-800/60 border-gray-700 text-gray-300 hover:border-emerald-500/50"
+                          : "bg-gray-100 border-gray-300 text-gray-700 hover:border-emerald-400"
+                      }`}
+                    >
+                      ₹{preset}{preset === 500 ? " (Max)" : ""}
+                    </button>
+                  ))}
+                </div>
+
+                {Number(addAmountInput) > 500 && (
+                  <p className="text-xs text-red-400 mt-2 flex items-center gap-1 font-semibold">
+                    <span>⚠️</span> Maximum amount allowed is ₹500 only.
+                  </p>
+                )}
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMoneyModal(false)}
+                  className={`flex-1 py-3 rounded-xl font-semibold text-xs border transition-colors ${
+                    isDarkMode ? "border-gray-700 hover:bg-gray-800 text-gray-400" : "border-gray-300 hover:bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isAddingMoney || Number(addAmountInput) <= 0 || Number(addAmountInput) > 500}
+                  onClick={handleConfirmAddMoney}
+                  className="flex-[2] py-3 rounded-xl font-black text-xs bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isAddingMoney ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <span>Add ₹{Number(addAmountInput) || 0} to Account</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

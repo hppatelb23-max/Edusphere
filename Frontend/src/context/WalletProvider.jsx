@@ -45,51 +45,11 @@ export const WalletProvider = ({ children }) => {
       sessionStorage.setItem("walletConnected", "true");
     }
 
-    if (role === "educator") {
-      try {
-        const response = await axios.post(
-          `${API_BASE_URL}/admin/login`,
-          { wallet_id: account },
-          { headers: { "Content-Type": "application/json" } }
-        );
-
-        if (response.status === 200 && response.data?.token) {
-          toast.success(response.data.message || "Educator logged in successfully");
-          setCookie("walletAddress", account, 7);
-          setCookie("adminWallet", account, 7);
-          localStorage.setItem("admin", response.data.data.id);
-          localStorage.setItem("adminWallet", account);
-          localStorage.setItem("educatorWallet", account);
-          setCookie("admin", response.data.token, 7);
-        }
-      } catch (error) {
-        console.warn("Educator login response:", error.response?.data || error.message);
-        if (error.response?.status === 404) {
-          toast.info("Account not found. Please add your educator details.");
-          if (callback) callback();
-        }
-      }
-    } else {
-      try {
-        const response = await axios.post(
-          `${API_BASE_URL}/user/login`,
-          { wallet_id: account },
-          { headers: { "Content-Type": "application/json" } }
-        );
-
-        if (response.status === 200 && response.data?.token) {
-          toast.success(response.data.message || "Student logged in successfully");
-          setCookie("walletAddress", account, 7);
-          localStorage.setItem("user", response.data.data.id);
-          setCookie("user", response.data.token, 7);
-        }
-      } catch (error) {
-        console.warn("Student login response:", error.response?.data || error.message);
-        if (error.response?.status === 404) {
-          toast.info("Account not found. Please add your student details.");
-          if (callback) callback();
-        }
-      }
+    // Always require Save & Continue with username verification upon wallet connection
+    if (callback) {
+      callback();
+    } else if (typeof window !== "undefined") {
+      window.location.href = "/signup";
     }
   };
 
@@ -209,6 +169,8 @@ export const WalletProvider = ({ children }) => {
     setWalletConnected(false);
     if (typeof window !== "undefined") {
       sessionStorage.removeItem("walletConnected");
+      sessionStorage.removeItem("session_user_logged_in");
+      sessionStorage.removeItem("session_educator_logged_in");
       localStorage.removeItem("walletConnected");
     }
     deleteCookie("walletAddress");
@@ -222,8 +184,8 @@ export const WalletProvider = ({ children }) => {
     localStorage.removeItem("walletAddress");
     localStorage.removeItem("role");
     try {
-      disconnect(config).catch(() => {});
-    } catch (e) {}
+      disconnect(config).catch(() => { });
+    } catch (e) { }
     if (!options?.silent) {
       toast.info("Wallet disconnected");
     }

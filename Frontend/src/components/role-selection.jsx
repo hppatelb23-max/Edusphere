@@ -6,6 +6,7 @@ import { useTheme } from "./Themecontext";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSun, faMoon, faChalkboardTeacher, faUserGraduate } from "@fortawesome/free-solid-svg-icons";
 import { useThemeStore } from "../store/themeStore";
+import { deleteCookie } from "../utils/api";
 
 
 const RoleSelection = () => {
@@ -14,6 +15,21 @@ const RoleSelection = () => {
 
   const handleRoleSelection = (role) => {
     localStorage.setItem("role", role);
+    if (role === "student") {
+      deleteCookie("admin");
+      deleteCookie("adminWallet");
+      localStorage.removeItem("admin");
+      localStorage.removeItem("educatorName");
+      localStorage.removeItem("educatorWallet");
+      localStorage.removeItem("adminWallet");
+      localStorage.removeItem("educator_transactions");
+      localStorage.removeItem("educator_purchases");
+    } else {
+      deleteCookie("user");
+      localStorage.removeItem("user");
+      localStorage.removeItem("studentName");
+      localStorage.removeItem("student_transactions");
+    }
     navigate(role === "student" ? "/studenthome" : "/educatorhome");
   };
 

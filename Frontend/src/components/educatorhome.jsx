@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiLogOut } from "react-icons/fi";
+import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy, FiLogOut, FiPlusCircle, FiCheckCircle } from "react-icons/fi";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useThemeStore } from "../store/themeStore";
 import { useWallet } from "../context/WalletProvider";
 import { API_BASE_URL, getCookie } from "../utils/api";
 import axios from "axios";
+import { toast } from "react-toastify";
+import ThreeLineMenu from "./ThreeLineMenu";
 
 const Edusphere = () => {
 
@@ -26,17 +28,219 @@ const Edusphere = () => {
     return saved ? Number(saved) : 0;
   });
 
+  const [inrBalance, setInrBalance] = useState(() => {
+    const saved = localStorage.getItem("educator_inr_balance") || localStorage.getItem("educator_inr_earnings");
+    return saved ? Number(saved) : 0;
+  });
+
+  // Add Money Modal State for Educator (UPI ID & Card Number, Max ₹2000)
+  const [showAddMoneyModal, setShowAddMoneyModal] = useState(false);
+  const [addMoneyMethod, setAddMoneyMethod] = useState("upi"); // 'upi' | 'card'
+  const [upiIdInput, setUpiIdInput] = useState("");
+  const [cardNumberInput, setCardNumberInput] = useState("");
+  const [cardExpiryInput, setCardExpiryInput] = useState("");
+  const [cardCvvInput, setCardCvvInput] = useState("");
+  const [addAmountInput, setAddAmountInput] = useState("1000");
+  const [isAddingMoney, setIsAddingMoney] = useState(false);
+
+  const handleCardNumberChange = (e) => {
+    const raw = e.target.value.replace(/\D/g, "").slice(0, 16);
+    const formatted = raw.match(/.{1,4}/g)?.join(" ") || raw;
+    setCardNumberInput(formatted);
+  };
+
+  const handleConfirmAddMoney = async (e) => {
+    e?.preventDefault();
+    const amt = Number(addAmountInput);
+
+    if (!amt || isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid amount (₹1 to ₹2000).");
+      return;
+    }
+    if (amt > 2000) {
+      toast.error("Maximum amount that can be added at a time is ₹2000 only.");
+      return;
+    }
+
+    if (addMoneyMethod === "upi") {
+      const trimmedUpi = upiIdInput.trim();
+      if (!trimmedUpi) {
+        toast.error("Please enter your UPI ID.");
+        return;
+      }
+      if (!trimmedUpi.includes("@")) {
+        toast.error("Please enter a valid UPI ID (e.g., educator@upi, mobile@paytm).");
+        return;
+      }
+    } else {
+      const cleanCard = cardNumberInput.replace(/\s+/g, "");
+      if (!cleanCard) {
+        toast.error("Please enter your Credit or Debit Card number.");
+        return;
+      }
+      if (cleanCard.length < 12) {
+        toast.error("Please enter a valid 12-16 digit Card number.");
+        return;
+      }
+    }
+
+    const activeWallet = walletAddress || localStorage.getItem("adminWallet") || localStorage.getItem("educatorWallet") || localStorage.getItem("walletAddress") || getCookie("walletAddress") || "";
+    const activeName = localStorage.getItem("educatorName") || localStorage.getItem("name") || (localStorage.getItem("role") === "educator" ? localStorage.getItem("username") : "") || "";
+
+    setIsAddingMoney(true);
+    try {
+      const token = getCookie("admin");
+      const methodLabel = addMoneyMethod === "upi" ? `UPI ID (${upiIdInput.trim()})` : `Card (•••• ${cardNumberInput.replace(/\s+/g, "").slice(-4)})`;
+      const res = await axios.post(`${API_BASE_URL}/admin/add-cash`, {
+        amount: amt,
+        wallet: activeWallet,
+        name: activeName,
+        payment_method: methodLabel
+      }, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+
+      const newBal = res.data?.new_balance ?? (inrBalance + amt);
+      setInrBalance(newBal);
+      localStorage.setItem("role", "educator");
+      localStorage.setItem("educator_inr_balance", String(newBal));
+      localStorage.setItem("educator_inr_earnings", String(newBal));
+
+      const receiptRecord = {
+        _id: res.data?.transaction?._id || `dep_${Date.now()}`,
+        invoice_no: `EDUDEP-${Date.now().toString().slice(-6)}`,
+        user_name: activeName || "Educator",
+        student_name: activeName || "Educator",
+        role: "Educator",
+        amount: amt,
+        currency: "INR",
+        payment_method: methodLabel,
+        transaction_address: res.data?.transaction?.transaction_address || `TXN-DEP-${Date.now()}`,
+        date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+        status: "SUCCESS",
+        type: "deposit",
+        course_purchased: `Personal Rupee Wallet Top-up (+₹${amt.toLocaleString("en-IN")})`,
+        course_title: `Personal Rupee Wallet Top-up (+₹${amt.toLocaleString("en-IN")})`,
+        educator_name: "Personal Rupee Wallet"
+      };
+
+      try {
+        const eduTxns = JSON.parse(localStorage.getItem("educator_transactions") || "[]");
+        eduTxns.unshift(receiptRecord);
+        localStorage.setItem("educator_transactions", JSON.stringify(eduTxns));
+        localStorage.setItem("educator_purchases", JSON.stringify(eduTxns));
+      } catch (e) {}
+
+      try {
+        window.dispatchEvent(new CustomEvent("edusphere_balance_updated", {
+          detail: { balance: newBal, isEducator: true }
+        }));
+        window.dispatchEvent(new CustomEvent("edusphere_transaction_created", {
+          detail: { transaction: receiptRecord, isEducator: true }
+        }));
+        window.dispatchEvent(new Event("storage"));
+      } catch (evErr) {}
+
+      toast.success(`🎉 Added ₹${amt} via ${addMoneyMethod === "upi" ? "UPI ID" : "Card"}! Balance: ₹${newBal}`);
+      setShowAddMoneyModal(false);
+      setUpiIdInput("");
+      setCardNumberInput("");
+      setCardExpiryInput("");
+      setCardCvvInput("");
+      setAddAmountInput("1000");
+    } catch (err) {
+      const errMsg = err.response?.data?.error || err.message;
+      if (err.response?.status === 400 && errMsg) {
+        toast.error(errMsg);
+      } else {
+        const newBal = inrBalance + amt;
+        setInrBalance(newBal);
+        localStorage.setItem("role", "educator");
+        localStorage.setItem("educator_inr_balance", String(newBal));
+        localStorage.setItem("educator_inr_earnings", String(newBal));
+
+        const fallbackReceipt = {
+          _id: `dep_${Date.now()}`,
+          invoice_no: `EDUDEP-${Date.now().toString().slice(-6)}`,
+          user_name: activeName || "Educator",
+          student_name: activeName || "Educator",
+          role: "Educator",
+          amount: amt,
+          currency: "INR",
+          payment_method: methodLabel,
+          transaction_address: `TXN-DEP-${Date.now()}`,
+          date: new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+          status: "SUCCESS",
+          type: "deposit",
+          course_purchased: `Personal Rupee Wallet Top-up (+₹${amt.toLocaleString("en-IN")})`,
+          course_title: `Personal Rupee Wallet Top-up (+₹${amt.toLocaleString("en-IN")})`,
+          educator_name: "Personal Rupee Wallet"
+        };
+
+        try {
+          const eduTxns = JSON.parse(localStorage.getItem("educator_transactions") || "[]");
+          eduTxns.unshift(fallbackReceipt);
+          localStorage.setItem("educator_transactions", JSON.stringify(eduTxns));
+          localStorage.setItem("educator_purchases", JSON.stringify(eduTxns));
+        } catch (e) {}
+
+        try {
+          window.dispatchEvent(new CustomEvent("edusphere_balance_updated", {
+            detail: { balance: newBal, isEducator: true }
+          }));
+          window.dispatchEvent(new CustomEvent("edusphere_transaction_created", {
+            detail: { transaction: fallbackReceipt, isEducator: true }
+          }));
+          window.dispatchEvent(new Event("storage"));
+        } catch (evErr) {}
+
+        toast.success(`🎉 Added ₹${amt}! New Balance: ₹${newBal}`);
+        setShowAddMoneyModal(false);
+      }
+    } finally {
+      setIsAddingMoney(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleBalanceUpdate = (e) => {
+      if (e?.detail?.balance !== undefined) {
+        setInrBalance(Number(e.detail.balance));
+        setInrEarnings(Number(e.detail.balance));
+      } else {
+        const saved = localStorage.getItem("educator_inr_balance") || localStorage.getItem("educator_inr_earnings");
+        if (saved !== null && saved !== undefined) {
+          setInrBalance(Number(saved));
+          setInrEarnings(Number(saved));
+        }
+      }
+    };
+    window.addEventListener("edusphere_balance_updated", handleBalanceUpdate);
+    window.addEventListener("storage", handleBalanceUpdate);
+    return () => {
+      window.removeEventListener("edusphere_balance_updated", handleBalanceUpdate);
+      window.removeEventListener("storage", handleBalanceUpdate);
+    };
+  }, []);
+
   useEffect(() => {
     const fetchEarnings = async () => {
       try {
         const token = getCookie("admin");
+        const activeWallet = walletAddress || localStorage.getItem("walletAddress") || localStorage.getItem("educatorWallet") || getCookie("walletAddress") || "";
+        const activeName = localStorage.getItem("username") || localStorage.getItem("educatorName") || "";
+        if (!activeWallet && !activeName) return;
+
         const res = await axios.get(`${API_BASE_URL}/admin/inr-earnings`, {
-          params: { wallet: walletAddress || "" },
+          params: { wallet: activeWallet, name: activeName },
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
         const amt = res.data?.inr_earnings ?? 0;
+        const bal = res.data?.inr_balance ?? amt;
         setInrEarnings(amt);
+        setInrBalance(bal);
         localStorage.setItem("educator_inr_earnings", String(amt));
+        localStorage.setItem("educator_inr_balance", String(bal));
       } catch (e) {}
     };
     fetchEarnings();
@@ -92,60 +296,62 @@ const Edusphere = () => {
         } transition-colors duration-300`}
     >
       {/* Navbar Section */}
-      <nav className={`flex justify-between items-center p-5 px-8 ${isDarkMode ? "bg-gray-900/80 border-b border-gray-700/50" : "bg-white/90 backdrop-blur-sm border-b border-amber-200/70 shadow-sm"} sticky top-0 z-40`}>
-        <div className="flex items-center space-x-2">
+      <nav className={`flex justify-between items-center py-4 px-6 sm:px-8 gap-4 ${isDarkMode ? "bg-gray-900/90 border-b border-gray-700/50" : "bg-white/95 backdrop-blur-sm border-b border-amber-200/70 shadow-sm"} sticky top-0 z-40`}>
+        <div className="flex items-center space-x-3 shrink-0 mr-4">
           <img
             src="/images/Edusphere logo.png"
             alt="Logo"
-            className="w-12 h-12 rounded-full shadow-lg"
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-full shadow-lg"
           />
-
-          <h1 className="text-4xl font-bold ">Edusphere</h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">Edusphere</h1>
         </div>
-        <div className="flex items-center space-x-8">
-          <div className="flex space-x-8">
-            <Link
-              to="/educatorhome"
-              className="group relative text-lg font-medium hover:text-amber-500 transition-colors"
-            >
-              Home
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-            <Link
-              to="/createcourses"
-              className="group relative text-lg font-medium hover:text-amber-500 transition-colors"
-            >
-              Create Courses
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-            <Link
-              to="/create-test"
-              className="group relative text-lg font-medium hover:text-amber-500 transition-colors"
-            >
-              Create Test
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-            <Link
-              to="/educator-marks"
-              className="group relative text-lg font-medium hover:text-emerald-400 transition-colors"
-            >
-              Student Marks
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-400 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-            <Link
-              to="/tests"
-              className="group relative text-lg font-medium hover:text-amber-500 transition-colors"
-            >
-              Test Facility
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
-            </Link>
-          </div>
 
-          {/* Educator INR Revenue Badge */}
-          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
-            <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Earnings:</span>
-            <span className="font-black text-sm text-emerald-300">₹{Number(inrEarnings).toLocaleString("en-IN")} INR</span>
-          </div>
+        <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
+          <Link
+            to="/educatorhome"
+            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+          >
+            Home
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
+          </Link>
+          <Link
+            to="/createcourses"
+            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+          >
+            Create Courses
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
+          </Link>
+          <Link
+            to="/create-test"
+            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+          >
+            Create Test
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
+          </Link>
+          <Link
+            to="/educator-marks"
+            className="group relative text-base font-semibold hover:text-emerald-400 transition-colors"
+          >
+            Student Marks
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-400 group-hover:w-full transition-all duration-300"></span>
+          </Link>
+          <Link
+            to="/tests"
+            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+          >
+            Test Facility
+            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
+          </Link>
+        </div>
+
+        <div className="flex items-center space-x-3 sm:space-x-4 shrink-0">
+          {/* Educator Online Money Badge ONLY (No + Add Money button here per user instruction) */}
+          {walletConnected && (
+            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Online Money Available:</span>
+              <span className="font-black text-sm text-emerald-300 font-mono">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+            </div>
+          )}
 
           {/* Wallet Button */}
           <motion.button
@@ -183,75 +389,8 @@ const Edusphere = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className="text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full hover:shadow-md transition-all"
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-lg ${isDarkMode
-                      ? "bg-gray-800/95 border border-gray-700"
-                      : "bg-white/95 border border-amber-100"
-                    } z-50`}
-                >
-                  <div className="p-2 space-y-1">
-                    <Link
-                      to="/create-test"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 text-amber-500 font-semibold"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Create Test</span>
-                    </Link>
-                    <Link
-                      to="/educator-marks"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-emerald-500/10 text-emerald-400 font-semibold"
-                    >
-                      <FiBook className="text-emerald-400" />
-                      <span>Student Marks</span>
-                    </Link>
-                    <Link
-                      to="/tests"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Test Facility</span>
-                    </Link>
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiUser className="text-amber-500" />
-                      <span>Add Details</span>
-                    </Link>
-
-
-                    <Link
-                      to="/managecourses"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Manage Courses</span>
-                    </Link>
-                    <button
-                      onClick={() => disconnectWallet()}
-                      className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-red-500/10 text-red-400 font-semibold transition-colors text-left"
-                    >
-                      <FiLogOut className="text-red-400" />
-                      <span>Disconnect Wallet</span>
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* 100% Uniform Three Line Menu Component (Educator Only) */}
+          <ThreeLineMenu isEducator={true} />
         </div>
       </nav>
       <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-amber-200/60"}></div>

@@ -25,6 +25,7 @@ import {
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
 import { useThemeStore } from "../../store/themeStore";
+import ThreeLineMenu from "../ThreeLineMenu";
 import { useTheme } from "next-themes";
 import { createNewTest } from "../../utils/testsApi";
 import ImageZoomModal from "./ImageZoomModal";
@@ -48,6 +49,17 @@ const CreateTest = () => {
   const [category, setCategory] = useState("Web3");
   const [difficulty, setDifficulty] = useState("Intermediate");
   const [durationMinutes, setDurationMinutes] = useState(15);
+  const [testType, setTestType] = useState("normal"); // "normal" | "scheduled"
+  const [scheduleStart, setScheduleStart] = useState(() => {
+    const d = new Date(Date.now() + 15 * 60 * 1000);
+    d.setSeconds(0, 0);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
+  const [scheduleEnd, setScheduleEnd] = useState(() => {
+    const d = new Date(Date.now() + 60 * 60 * 1000);
+    d.setSeconds(0, 0);
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  });
   const [passingScore, setPassingScore] = useState(60);
   const [pickRandomCount, setPickRandomCount] = useState(2);
   const [authorName, setAuthorName] = useState("Educator");
@@ -306,6 +318,24 @@ const CreateTest = () => {
       return;
     }
 
+    if (testType === "scheduled") {
+      if (!scheduleStart || !scheduleEnd) {
+        toast.error("Please specify both window start and end time for the scheduled assessment.");
+        return;
+      }
+      const startMs = new Date(scheduleStart).getTime();
+      const endMs = new Date(scheduleEnd).getTime();
+      if (isNaN(startMs) || isNaN(endMs) || endMs <= startMs) {
+        toast.error("Schedule end time must be after the start time.");
+        return;
+      }
+      const windowMinutes = (endMs - startMs) / (60 * 1000);
+      if (Number(durationMinutes) > windowMinutes) {
+        toast.error(`Exam duration (${durationMinutes} mins) cannot exceed the scheduled window (${Math.round(windowMinutes)} mins).`);
+        return;
+      }
+    }
+
     // Validate that every question has at least question text OR diagram image
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
@@ -360,6 +390,9 @@ const CreateTest = () => {
         category: [category],
         difficulty: difficulty,
         duration_minutes: Number(durationMinutes) || 15,
+        test_type: testType,
+        schedule_start: testType === "scheduled" ? new Date(scheduleStart).toISOString() : null,
+        schedule_end: testType === "scheduled" ? new Date(scheduleEnd).toISOString() : null,
         passing_score: Number(passingScore) || 60,
         pick_random_count: Math.min(Math.max(Number(pickRandomCount) || totalQs, 1), totalQs),
         author_name: authorName.trim() || "Educator",
@@ -459,58 +492,7 @@ const CreateTest = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full font-bold hover:shadow-md transition-all"
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl backdrop-blur-lg ${
-                    isDarkMode ? "bg-gray-800/95 border border-gray-700" : "bg-white/95 border border-amber-100"
-                  } z-50`}
-                >
-                  <div className="p-2 space-y-1 text-sm">
-                    <Link
-                      to="/create-test"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 text-amber-400 font-semibold"
-                    >
-                      <FiPlus className="text-amber-400" />
-                      <span>Create Test</span>
-                    </Link>
-                    <Link
-                      to="/tests"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBookOpen className="text-amber-500" />
-                      <span>Test Facility</span>
-                    </Link>
-                    <Link
-                      to="/createcourses"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Create Courses</span>
-                    </Link>
-                    <Link
-                      to="/managecourses"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBookOpen className="text-amber-500" />
-                      <span>Manage Courses</span>
-                    </Link>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ThreeLineMenu isEducator={true} isDarkMode={isDarkMode} />
         </div>
       </nav>
 
@@ -643,6 +625,99 @@ const CreateTest = () => {
                 />
               </div>
 
+              {/* Test Mode Selection: Normal vs Scheduled */}
+              <div className="md:col-span-2 p-5 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                <label className="block text-xs font-bold uppercase tracking-wider mb-3 text-amber-400 flex items-center gap-2">
+                  <FiClock className="w-4 h-4" />
+                  <span>Assessment Type & Schedule Mode</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setTestType("normal")}
+                    className={`p-4 rounded-xl border text-left transition-all ${
+                      testType === "normal"
+                        ? "bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-md shadow-amber-500/10"
+                        : "bg-gray-800/40 border-gray-700 text-gray-400 hover:border-gray-600"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-semibold mb-1">
+                      <span>📝 Normal Assessment</span>
+                    </div>
+                    <p className="text-xs text-gray-400 font-normal">
+                      Candidates can start and complete this assessment at any time at their own pace.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setTestType("scheduled")}
+                    className={`p-4 rounded-xl border text-left transition-all ${
+                      testType === "scheduled"
+                        ? "bg-amber-500/20 border-amber-400 text-amber-300 font-bold shadow-md shadow-amber-500/10"
+                        : "bg-gray-800/40 border-gray-700 text-gray-400 hover:border-gray-600"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 text-sm font-semibold mb-1">
+                      <span>⏰ Scheduled Assessment</span>
+                    </div>
+                    <p className="text-xs text-gray-400 font-normal">
+                      Set a strict time window (e.g. 10:00 PM – 10:30 PM). Candidates can only give test within this window.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Scheduled Time Pickers */}
+                {testType === "scheduled" && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-amber-500/20"
+                  >
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                        Window Start Time *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={scheduleStart}
+                        onChange={(e) => setScheduleStart(e.target.value)}
+                        className={`w-full p-3.5 rounded-xl text-sm border focus:outline-none transition-all ${
+                          isDarkMode
+                            ? "bg-gray-900 border-gray-700 text-white focus:border-amber-400"
+                            : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
+                        }`}
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                        Window End Time (Deadline) *
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={scheduleEnd}
+                        onChange={(e) => setScheduleEnd(e.target.value)}
+                        className={`w-full p-3.5 rounded-xl text-sm border focus:outline-none transition-all ${
+                          isDarkMode
+                            ? "bg-gray-900 border-gray-700 text-white focus:border-amber-400"
+                            : "bg-white border-gray-300 text-gray-900 focus:border-amber-500"
+                        }`}
+                        required
+                      />
+                    </div>
+
+                    <p className="sm:col-span-2 text-xs text-amber-400/90 flex items-center gap-1.5 font-medium">
+                      <FiShield className="shrink-0 text-amber-400" />
+                      <span>
+                        Students can only give exam during this window and cannot start after the window closes. If device shuts down or tab is closed, test pauses and can be resumed within this window. Missed tests will be notified in student marks.
+                      </span>
+                    </p>
+                  </motion.div>
+                )}
+              </div>
+
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider mb-2 text-gray-400">Category</label>
@@ -660,6 +735,8 @@ const CreateTest = () => {
                   <option value="DeFi">DeFi Architecture</option>
                   <option value="Security">Blockchain Security & Auditing</option>
                   <option value="AI & ML">Artificial Intelligence & ML</option>
+                  <option value="College Course">College Course</option>
+                  <option value="School Course">School Course</option>
                   <option value="General">General Computer Science</option>
                 </select>
               </div>

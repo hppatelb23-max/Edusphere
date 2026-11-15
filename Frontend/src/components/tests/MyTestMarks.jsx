@@ -1,8 +1,10 @@
+import ThreeLineMenu from "../ThreeLineMenu";
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FiAward,
+  FiAlertTriangle,
   FiBookOpen,
   FiCheckCircle,
   FiXCircle,
@@ -23,6 +25,7 @@ import { useThemeStore } from "../../store/themeStore";
 import { useTheme } from "next-themes";
 import { fetchMySubmissions } from "../../utils/testsApi";
 import { getStoredTests, dummySampleTests } from "../../utils/dummyTests";
+import { getCookie } from "../../utils/api";
 import ImageZoomModal from "./ImageZoomModal";
 
 const MyTestMarks = () => {
@@ -75,18 +78,26 @@ const MyTestMarks = () => {
   const userRole = localStorage.getItem("role") || "student";
   const studentName = localStorage.getItem("username") || localStorage.getItem("name") || "";
   const isEducator = userRole === "educator";
+  const effectiveWallet = walletAddress || localStorage.getItem("walletAddress") || getCookie("walletAddress") || "";
+  const effectiveName = studentName || localStorage.getItem("username") || localStorage.getItem("studentName") || "";
+  const isStudentLoggedIn = walletConnected || Boolean(effectiveWallet) || Boolean(effectiveName);
 
   useEffect(() => {
     if (isEducator) {
       navigate("/educator-marks");
       return;
     }
-    if (!walletConnected || !walletAddress) return;
+    const wallet = effectiveWallet;
+    const name = effectiveName;
+    if (!wallet && !name) {
+      setLoading(false);
+      return;
+    }
     const load = async () => {
       setLoading(true);
       try {
-        const data = await fetchMySubmissions(walletAddress);
-        setSubmissions(data);
+        const data = await fetchMySubmissions(wallet, name);
+        setSubmissions(data || []);
       } catch (err) {
         console.error("Failed to load submissions:", err);
       } finally {
@@ -94,7 +105,7 @@ const MyTestMarks = () => {
       }
     };
     load();
-  }, [walletAddress, walletConnected, isEducator]);
+  }, [walletAddress, walletConnected, isEducator, effectiveWallet, effectiveName]);
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
@@ -226,74 +237,7 @@ const MyTestMarks = () => {
           {isDarkMode ? "🌙" : "☀️"}
         </button>
 
-        {/* Dropdown */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full font-bold hover:shadow-md transition-all"
-          >
-            ☰
-          </button>
-          <AnimatePresence>
-            {dropdownOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className={`absolute right-0 mt-2 w-64 rounded-xl shadow-xl backdrop-blur-lg ${
-                  isDarkMode
-                    ? "bg-gray-800/95 border border-gray-700"
-                    : "bg-white/95 border border-amber-100"
-                } z-50`}
-              >
-                <div className="p-2 space-y-1 text-sm">
-                  <Link
-                    to="/tests"
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                  >
-                    <FiBookOpen className="text-amber-400" />
-                    <span>Test Facility</span>
-                  </Link>
-                  <Link
-                    to="/my-test-marks"
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 text-amber-400 font-semibold"
-                  >
-                    <FiAward className="text-amber-400" />
-                    <span>My Test Marks</span>
-                  </Link>
-                  <Link
-                    to="/courses"
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                  >
-                    <FiBook className="text-amber-500" />
-                    <span>Courses</span>
-                  </Link>
-                  <Link
-                    to="/mylearning"
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                  >
-                    <FiBookOpen className="text-amber-500" />
-                    <span>My Learning</span>
-                  </Link>
-                  <Link
-                    to="/transaction"
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                  >
-                    <FiDollarSign className="text-amber-500" />
-                    <span>Transactions</span>
-                  </Link>
-                  <Link
-                    to="/redeem"
-                    className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                  >
-                    <FiGift className="text-amber-500" />
-                    <span>Redeem</span>
-                  </Link>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <ThreeLineMenu isEducator={false} isDarkMode={isDarkMode} />
       </div>
     </nav>
   );
@@ -301,7 +245,7 @@ const MyTestMarks = () => {
   /* ================================================================ */
   /* WALLET NOT CONNECTED STATE                                        */
   /* ================================================================ */
-  if (!walletConnected || !walletAddress) {
+  if (!isStudentLoggedIn) {
     return (
       <div
         className={`min-h-screen ${
@@ -364,22 +308,24 @@ const MyTestMarks = () => {
                 Personal Score Dashboard
               </div>
               <h1 className="text-3xl md:text-4xl font-black mb-2">
-                My <span className="text-amber-400">Test History</span>
+                Student <span className="text-amber-400">Test Review</span> & Marks
               </h1>
               <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
-                All your past assessments, scores, and mistake reviews in one place.
+                All your past assessments, scores, answers, and detailed mistake reviews in one place.
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              {studentName && (
+              {effectiveName && (
                 <div className="text-amber-400 font-bold text-sm">
-                  {studentName}
+                  {effectiveName}
                 </div>
               )}
-              <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <FiShield className="w-3.5 h-3.5" />
-                {walletAddress.slice(0, 10)}...{walletAddress.slice(-6)}
-              </div>
+              {effectiveWallet && (
+                <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <FiShield className="w-3.5 h-3.5" />
+                  {effectiveWallet.length > 16 ? `${effectiveWallet.slice(0, 10)}...${effectiveWallet.slice(-6)}` : effectiveWallet}
+                </div>
+              )}
               <Link
                 to="/tests"
                 className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm bg-amber-500 hover:bg-amber-400 text-black transition-all"
@@ -461,77 +407,114 @@ const MyTestMarks = () => {
                       : "bg-white border-amber-200"
                   } shadow-md`}
                 >
-                  {/* Card header */}
-                  <div className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                            sub.passed
-                              ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
-                              : "bg-red-500/20 border border-red-500/30 text-red-400"
-                          }`}
-                        >
-                          {sub.passed ? (
-                            <FiCheckCircle className="w-5 h-5" />
-                          ) : (
-                            <FiXCircle className="w-5 h-5" />
-                          )}
+                  {sub.is_missed ? (
+                    /* Missed Scheduled Assessment Banner */
+                    <div className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-red-500/5 border border-red-500/30 rounded-2xl">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-red-500/20 border border-red-500/40 text-red-400 shrink-0 shadow-lg shadow-red-500/10">
+                          <FiAlertTriangle className="w-6 h-6" />
                         </div>
                         <div>
-                          <h3 className="font-bold text-lg leading-tight">
-                            {sub.test_title || "Assessment"}
-                          </h3>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <FiClock className="w-3 h-3 text-gray-400" />
-                            <span className="text-xs text-gray-400">
-                              {formatDate(sub.submitted_at)}
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-bold text-lg leading-tight text-red-300">
+                              {sub.test_title || "Scheduled Assessment"}
+                            </h3>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-500/20 text-red-400 border border-red-500/40">
+                              Missed Test
                             </span>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Score badge + expand */}
-                    <div className="flex items-center gap-4">
-                      <div className="text-center">
-                        <div
-                          className={`text-3xl font-black ${
-                            sub.passed ? "text-emerald-400" : "text-red-400"
-                          }`}
-                        >
-                          {sub.score_percentage ?? "—"}%
-                        </div>
-                        <div className="text-xs text-gray-400 mt-0.5">
-                          {sub.correct_answers ?? "?"}/{sub.total_questions ?? "?"} correct
+                          <p className="text-xs text-gray-400">
+                            Scheduled Window: <span className="text-gray-300 font-medium">{sub.schedule_start ? formatDate(sub.schedule_start) : "Start"} – {sub.schedule_end ? formatDate(sub.schedule_end) : "End"}</span>
+                          </p>
+                          <p className="text-xs text-red-400/90 mt-1">
+                            ⚠️ The exam window for this scheduled assessment has ended without an attempt. Result marked as Absent / Expired.
+                          </p>
                         </div>
                       </div>
 
-                      <span
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
-                          sub.passed
-                            ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
-                            : "bg-red-500/15 border-red-500/30 text-red-400"
-                        }`}
-                      >
-                        {sub.passed ? "PASSED" : "FAILED"}
-                      </span>
-
-                      <button
-                        onClick={toggleExpand}
-                        className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all ${
-                          isExpanded
-                            ? "bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-400/20"
-                            : isDarkMode
-                            ? "bg-amber-500/15 border-amber-400/40 hover:bg-amber-400 hover:text-black text-amber-400"
-                            : "bg-amber-100/80 border-amber-300 hover:bg-amber-400 hover:text-black text-amber-900"
-                        }`}
-                      >
-                        <FiEye className="w-4 h-4" />
-                        <span>{isExpanded ? "Hide Review" : `Review Mistakes (${sub.wrong_answers ?? 0} Wrong)`}</span>
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <div className="text-center">
+                          <div className="text-3xl font-black text-red-500">0%</div>
+                          <div className="text-xs text-gray-400 mt-0.5">Absent / Expired</div>
+                        </div>
+                        <span className="px-3 py-1.5 rounded-full text-xs font-bold border bg-red-500/15 border-red-500/40 text-red-400">
+                          MISSED
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {/* Card header */}
+                      <div className="p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div
+                              className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                sub.passed
+                                  ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
+                                  : "bg-red-500/20 border border-red-500/30 text-red-400"
+                              }`}
+                            >
+                              {sub.passed ? (
+                                <FiCheckCircle className="w-5 h-5" />
+                              ) : (
+                                <FiXCircle className="w-5 h-5" />
+                              )}
+                            </div>
+                            <div>
+                              <h3 className="font-bold text-lg leading-tight">
+                                {sub.test_title || "Assessment"}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <FiClock className="w-3 h-3 text-gray-400" />
+                                <span className="text-xs text-gray-400">
+                                  {formatDate(sub.submitted_at)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Score badge + expand */}
+                        <div className="flex items-center gap-4">
+                          <div className="text-center">
+                            <div
+                              className={`text-3xl font-black ${
+                                sub.passed ? "text-emerald-400" : "text-red-400"
+                              }`}
+                            >
+                              {sub.score_percentage ?? "—"}%
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              {sub.correct_answers ?? "?"}/{sub.total_questions ?? "?"} correct
+                            </div>
+                          </div>
+
+                          <span
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                              sub.passed
+                                ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400"
+                                : "bg-red-500/15 border-red-500/30 text-red-400"
+                            }`}
+                          >
+                            {sub.passed ? "PASSED" : "FAILED"}
+                          </span>
+
+                          <button
+                            onClick={toggleExpand}
+                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all ${
+                              isExpanded
+                                ? "bg-amber-500 text-black border-amber-400 shadow-md shadow-amber-400/20"
+                                : isDarkMode
+                                ? "bg-amber-500/15 border-amber-400/40 hover:bg-amber-400 hover:text-black text-amber-400"
+                                : "bg-amber-100/80 border-amber-300 hover:bg-amber-400 hover:text-black text-amber-900"
+                            }`}
+                          >
+                            <FiEye className="w-4 h-4" />
+                            <span>{isExpanded ? "Hide Review" : `Review Mistakes (${sub.wrong_answers ?? 0} Wrong)`}</span>
+                          </button>
+                        </div>
+                      </div>
 
                   {/* Expanded question review */}
                   <AnimatePresence>
@@ -632,15 +615,38 @@ const MyTestMarks = () => {
                                   return found !== -1 ? found : -1;
                                 };
 
-                                const correctOptIdx = resolveOptIdx(item.correct_option);
-                                const selectedOptIdx = resolveOptIdx(item.selected_option);
+                                let correctOptIdx = resolveOptIdx(item.correct_option);
+                                let selectedOptIdx = resolveOptIdx(item.selected_option);
+
+                                if (selectedOptIdx === -1 && item.selected_option_text) {
+                                  const textMatch = optionsList.findIndex(
+                                    (o) => String(o).trim().toLowerCase() === String(item.selected_option_text).trim().toLowerCase()
+                                  );
+                                  if (textMatch !== -1) selectedOptIdx = textMatch;
+                                }
+
+                                if (item.is_correct && selectedOptIdx === -1 && correctOptIdx !== -1) {
+                                  selectedOptIdx = correctOptIdx;
+                                }
+
+                                const isTextIdentical =
+                                  selectedOptIdx !== -1 &&
+                                  correctOptIdx !== -1 &&
+                                  optionsList[selectedOptIdx] &&
+                                  optionsList[correctOptIdx] &&
+                                  String(optionsList[selectedOptIdx]).trim().toLowerCase() ===
+                                    String(optionsList[correctOptIdx]).trim().toLowerCase();
 
                                 const isCorrect =
-                                  correctOptIdx !== -1 && selectedOptIdx !== -1
-                                    ? correctOptIdx === selectedOptIdx
-                                    : Boolean(item.is_correct);
+                                  Boolean(item.is_correct) ||
+                                  (correctOptIdx !== -1 && selectedOptIdx !== -1 && correctOptIdx === selectedOptIdx) ||
+                                  isTextIdentical;
 
-                                const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : "None";
+                                if (isCorrect && selectedOptIdx === -1 && correctOptIdx !== -1) {
+                                  selectedOptIdx = correctOptIdx;
+                                }
+
+                                const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : null;
                                 const studentAnsText = selectedOptIdx !== -1 && optionsList[selectedOptIdx] ? optionsList[selectedOptIdx] : "";
                                 const correctOptLetter = correctOptIdx !== -1 ? optionLetters[correctOptIdx] : "A";
                                 const correctAnsText = correctOptIdx !== -1 && optionsList[correctOptIdx] ? optionsList[correctOptIdx] : "";
@@ -651,11 +657,11 @@ const MyTestMarks = () => {
                                     className={`rounded-2xl p-5 border text-sm transition-all ${
                                       isCorrect
                                         ? isDarkMode
-                                          ? "bg-emerald-950/20 border-emerald-500/40 shadow-sm"
-                                          : "bg-emerald-50/70 border-emerald-300 shadow-sm"
+                                          ? "bg-emerald-950/20 border-emerald-500/50 shadow-md shadow-emerald-500/10"
+                                          : "bg-emerald-50/80 border-emerald-400 shadow-md shadow-emerald-500/10"
                                         : isDarkMode
-                                        ? "bg-red-950/25 border-red-500/40 shadow-sm"
-                                        : "bg-red-50/70 border-red-300 shadow-sm"
+                                        ? "bg-red-950/25 border-red-500/50 shadow-md shadow-red-500/10"
+                                        : "bg-red-50/80 border-red-300 shadow-md shadow-red-500/10"
                                     }`}
                                   >
                                     {/* Question header */}
@@ -664,40 +670,51 @@ const MyTestMarks = () => {
                                         Question {qIdx + 1}
                                       </span>
                                       <span
-                                        className={`text-xs px-3 py-1 rounded-full font-extrabold border flex items-center gap-1.5 shadow-sm ${
+                                        className={`text-xs px-3.5 py-1.5 rounded-full font-black border flex items-center gap-1.5 shadow-sm ${
                                           isCorrect
-                                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                                            : "bg-red-500/20 border-red-500/50 text-red-400"
+                                            ? "bg-emerald-500/20 border-emerald-500/60 text-emerald-300"
+                                            : "bg-red-500/20 border-red-500/60 text-red-300"
                                         }`}
                                       >
                                         {isCorrect ? (
                                           <>
-                                            <FiCheckCircle className="w-3.5 h-3.5" />
+                                            <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
                                             <span>✓ Correct Solution</span>
                                           </>
                                         ) : (
                                           <>
-                                            <FiXCircle className="w-3.5 h-3.5" />
+                                            <FiXCircle className="w-3.5 h-3.5 text-red-400" />
                                             <span>✗ Incorrect Answer</span>
                                           </>
                                         )}
                                       </span>
                                     </div>
 
-                                    {/* Wrong Answer Warning Banner */}
-                                    {!isCorrect && (
-                                      <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                        <div className="flex items-center gap-2 text-red-300">
-                                          <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                                    {/* Answer Banner: Green for Correct, Red+Green for Wrong */}
+                                    {isCorrect ? (
+                                      <div className="p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-500/50 text-xs mb-4 flex items-center gap-2 text-emerald-300 w-full">
+                                        <span className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-black text-[11px] shrink-0">
+                                          ✓
+                                        </span>
+                                        <span className="leading-relaxed break-words">
+                                          <strong>Your Choice:</strong> {studentOptLetter ? `Option ${studentOptLetter} (${studentAnsText})` : (studentAnsText || `Option ${correctOptLetter}`)} <span className="font-extrabold text-emerald-400">(✓ Correct Solution)</span>
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-4 flex flex-col gap-2.5 w-full">
+                                        <div className="flex items-start gap-2 text-red-300">
+                                          <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
                                             ✗
                                           </span>
-                                          <span>
-                                            <strong>Your Choice:</strong> Option {studentOptLetter}{studentAnsText ? ` (${studentAnsText})` : ""} <span className="font-extrabold text-red-400">(Incorrect)</span>
+                                          <span className="leading-relaxed break-words">
+                                            <strong>Your Choice:</strong> {studentOptLetter ? `Option ${studentOptLetter} (${studentAnsText})` : <span className="text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30">Not Answered / Skipped</span>} <span className="font-extrabold text-red-400">(Incorrect)</span>
                                           </span>
                                         </div>
-                                        <div className="flex items-center gap-1.5 self-start sm:self-auto bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-extrabold shrink-0">
-                                          <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                                          <span>Correct Answer: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}</span>
+                                        <div className="flex items-start gap-2 bg-emerald-950/80 p-3 rounded-xl border border-emerald-500/40 text-emerald-300 font-bold w-full leading-relaxed">
+                                          <FiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                                          <span className="break-words">
+                                            Correct Answer: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}
+                                          </span>
                                         </div>
                                       </div>
                                     )}
@@ -818,6 +835,8 @@ const MyTestMarks = () => {
                       );
                     })()}
                   </AnimatePresence>
+                    </>
+                  )}
                 </motion.div>
               );
             })}

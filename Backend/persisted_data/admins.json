@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "6af856b6fed68cb44aa2f483",
+    "__v": 31,
+    "admin_name": "Prof Pramila Chawan",
+    "courses_created": [
+      "6af960ec8799e60c2e219685"
+    ],
+    "courses_enrolled": [
+      "6af86744730cb9221f3c0f6c",
+      "6af86744730cb9221f3c0f6a"
+    ],
+    "createdAt": "2026-11-15T12:44:38.659Z",
+    "inr_balance": 6238.0002,
+    "inr_earnings": 2471.0002,
+    "locked_account_name": "Prof Pramila Chawan",
+    "metamask_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "updatedAt": "2026-11-15T12:47:53.285Z"
+  }
+]

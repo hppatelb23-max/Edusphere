@@ -522,20 +522,38 @@ export const gradeTestSubmissionLocally = (test, answers, studentWallet) => {
     if (originalQ) {
       const optionsList = Array.isArray(originalQ.options) ? originalQ.options : [];
       const correctOptIdx = normalizeOptionIndex(originalQ.correct_option, optionsList);
-      const selectedOptIdx = normalizeOptionIndex(ans.selected_option, optionsList);
+      let selectedOptIdx = normalizeOptionIndex(ans.selected_option, optionsList);
+
+      if (selectedOptIdx === -1 && ans.selected_option_text) {
+        const textMatch = optionsList.findIndex(o =>
+          String(o).trim().toLowerCase() === String(ans.selected_option_text).trim().toLowerCase()
+        );
+        if (textMatch !== -1) selectedOptIdx = textMatch;
+      }
 
       let isCorrect = false;
       if (correctOptIdx !== -1 && selectedOptIdx !== -1) {
         isCorrect = (correctOptIdx === selectedOptIdx);
-      } else if (optionsList.length > 0) {
+      }
+      if (!isCorrect && optionsList.length > 0) {
         const correctText = String(optionsList[correctOptIdx] || originalQ.correct_option || "").trim().toLowerCase();
-        const selectedText = String(optionsList[selectedOptIdx] || ans.selected_option || "").trim().toLowerCase();
+        const selectedText = String(
+          optionsList[selectedOptIdx] ||
+          ans.selected_option_text ||
+          (typeof ans.selected_option === "string" ? ans.selected_option : "") ||
+          ""
+        ).trim().toLowerCase();
         if (correctText && selectedText && correctText === selectedText) {
           isCorrect = true;
+          if (selectedOptIdx === -1) selectedOptIdx = correctOptIdx;
         }
       }
 
-      if (isCorrect) correctCount++;
+      if (isCorrect) {
+        correctCount++;
+        if (selectedOptIdx === -1) selectedOptIdx = correctOptIdx;
+      }
+
       detailedReview.push({
         question_id: originalQ._id || originalQ.question,
         question: originalQ.question,
@@ -543,6 +561,7 @@ export const gradeTestSubmissionLocally = (test, answers, studentWallet) => {
         options: optionsList,
         option_images: originalQ.option_images || [],
         selected_option: selectedOptIdx,
+        selected_option_text: (selectedOptIdx >= 0 && optionsList[selectedOptIdx]) ? optionsList[selectedOptIdx] : (ans.selected_option_text || ""),
         correct_option: correctOptIdx !== -1 ? correctOptIdx : 0,
         is_correct: isCorrect,
         explanation: originalQ.explanation || "No explanation provided."
@@ -555,6 +574,13 @@ export const gradeTestSubmissionLocally = (test, answers, studentWallet) => {
   const passingScore = test.passing_score || 60;
   const passed = scorePercentage >= passingScore;
 
+  if (passed) {
+    try {
+      const currentCoins = Number(localStorage.getItem("student_coins") || 500);
+      localStorage.setItem("student_coins", String(currentCoins + 50));
+    } catch (e) {}
+  }
+
   const result = {
     test_id: test._id,
     test_title: test.title,
@@ -565,6 +591,7 @@ export const gradeTestSubmissionLocally = (test, answers, studentWallet) => {
     score_percentage: scorePercentage,
     passing_score: passingScore,
     passed: passed,
+    coins_awarded: passed ? 50 : 0,
     submitted_at: new Date().toISOString(),
     detailed_review: detailedReview
   };
@@ -643,27 +670,16 @@ const sampleStudentSubmissions = [
 export const getStoredSubmissions = () => {
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_SUBMISSIONS_KEY);
-    const currentUserName = localStorage.getItem("username") || localStorage.getItem("studentName") || localStorage.getItem("name") || "";
     if (!raw) {
-      localStorage.setItem(LOCAL_STORAGE_SUBMISSIONS_KEY, JSON.stringify(sampleStudentSubmissions));
-      return sampleStudentSubmissions;
+      return [];
     }
     const parsed = JSON.parse(raw);
-    const fallbackNames = ["Aarav Sharma", "Sneha Patel", "Rohan Verma", "Ananya Iyer", "Karan Malhotra"];
-    return parsed.map((s, idx) => {
-      if (!s.student_name || s.student_name.startsWith("0x")) {
-        const currentWallet = localStorage.getItem("walletAddress") || "";
-        if (currentWallet && s.student_wallet_id && s.student_wallet_id.toLowerCase() === currentWallet.toLowerCase() && currentUserName) {
-          s.student_name = currentUserName;
-        } else {
-          s.student_name = currentUserName || fallbackNames[idx % fallbackNames.length];
-        }
-      }
-      return s;
-    });
+    if (!Array.isArray(parsed)) return [];
+    // Only return real submissions created by users, excluding mock sample submissions
+    return parsed.filter(s => s && s.submission_id && !s.submission_id.startsWith("sub_sample_"));
   } catch (err) {
     console.warn("Error reading local submissions:", err);
-    return sampleStudentSubmissions;
+    return [];
   }
 };
 

@@ -60,6 +60,18 @@ const SubmissionSubSchema = new mongoose.Schema({
         type: String,
         default: "",
     },
+    recording_id_part1: {
+        type: String,
+        default: "",
+    },
+    recording_id_part2: {
+        type: String,
+        default: "",
+    },
+    has_interruption: {
+        type: Boolean,
+        default: false,
+    },
     proctor_logs: [{
         time: String,
         reason: String,
@@ -112,6 +124,19 @@ const TestSchema = new mongoose.Schema({
     duration_minutes: {
         type: Number,
         default: 15,
+    },
+    test_type: {
+        type: String,
+        enum: ["normal", "scheduled"],
+        default: "normal",
+    },
+    schedule_start: {
+        type: Date,
+        default: null,
+    },
+    schedule_end: {
+        type: Date,
+        default: null,
     },
     passing_score: {
         type: Number,

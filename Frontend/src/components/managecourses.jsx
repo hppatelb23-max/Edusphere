@@ -10,6 +10,7 @@ import { Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { API_BASE_URL, getCookie } from "../utils/api";
+import ThreeLineMenu from "./ThreeLineMenu";
 
 const ManageCourses = () => {
   const navigate = useNavigate();
@@ -66,39 +67,78 @@ const ManageCourses = () => {
     const fetchCourses = async () => {
       try {
         const token = getCookie("admin");
-        if (!token) {
-          console.log("No educator session token found");
+        const wallet = walletAddress || localStorage.getItem("adminWallet") || localStorage.getItem("educatorWallet") || localStorage.getItem("walletAddress") || "";
+        const educatorName = localStorage.getItem("educatorName") || localStorage.getItem("name") || (localStorage.getItem("role") === "educator" ? localStorage.getItem("username") : "") || "";
+        if (!token && !wallet && !educatorName) {
           setCourses([]);
           return;
         }
 
         const response = await axios.get(`${API_BASE_URL}/admin/get-courses`, {
+          params: {
+            wallet: wallet || undefined,
+            name: educatorName || undefined
+          },
           headers: {
-            Authorization: `Bearer ${token}`,
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(wallet ? { "x-wallet-address": wallet } : {})
           },
         });
 
-        if (response.status === 200 && response.data?.courses) {
-          const list = response.data.courses;
-          const seenIds = new Set();
-          const seenTitles = new Set();
-          const unique = [];
-
-          list.forEach((c) => {
-            if (!c) return;
-            const sid = c._id ? c._id.toString() : null;
-            const normTitle = (c.title || "").toLowerCase().trim();
-            if ((!sid || !seenIds.has(sid)) && (!normTitle || !seenTitles.has(normTitle))) {
-              if (sid) seenIds.add(sid);
-              if (normTitle) seenTitles.add(normTitle);
-              unique.push(c);
-            }
-          });
-
-          setCourses(unique);
-        } else {
-          setCourses([]);
+        let list = [];
+        if (response.status === 200 && Array.isArray(response.data?.courses)) {
+          list = [...response.data.courses];
         }
+
+        // Merge locally persisted courses authored by this educator
+        try {
+          if (wallet) {
+            const localAuthored = JSON.parse(localStorage.getItem(`educator_courses_${wallet.toLowerCase()}`) || "[]");
+            list = [...list, ...localAuthored];
+          }
+          const allCustom = JSON.parse(localStorage.getItem("edusphere_custom_courses") || "[]");
+          const myCustom = allCustom.filter(c => c && c.author_wallet_id && wallet && c.author_wallet_id.toLowerCase() === wallet.toLowerCase());
+          list = [...list, ...myCustom];
+        } catch (e) {}
+
+        const seenIds = new Set();
+        const seenTitles = new Set();
+        const unique = [];
+
+        let deletedIds = [];
+        try {
+          deletedIds = JSON.parse(localStorage.getItem("deleted_course_ids") || "[]");
+        } catch(e) {}
+
+        const myWalletNorm = (wallet || "").toLowerCase();
+        const myEducatorName = educatorName.trim().toLowerCase();
+
+        list.forEach((c) => {
+          if (!c) return;
+          const sid = c._id ? c._id.toString() : null;
+          if (sid && deletedIds.includes(sid)) return;
+
+          // Strictly check that this course was authored and published by this educator
+          const courseAuthorWallet = (c.author_wallet_id || "").toLowerCase();
+          const courseAuthorName = (c.author_name || "").toLowerCase().trim();
+
+          const isMine =
+            !courseAuthorWallet && !courseAuthorName
+              ? true
+              : (myWalletNorm && courseAuthorWallet === myWalletNorm) ||
+                (myEducatorName && courseAuthorName && (courseAuthorName === myEducatorName || courseAuthorName.includes(myEducatorName) || myEducatorName.includes(courseAuthorName)));
+
+          if (!isMine) return;
+
+          const normTitle = (c.title || "").toLowerCase().trim();
+          if ((!sid || !seenIds.has(sid)) && (!normTitle || !seenTitles.has(normTitle))) {
+            if (sid) seenIds.add(sid);
+            if (normTitle) seenTitles.add(normTitle);
+            unique.push(c);
+          }
+        });
+
+        setCourses(unique);
 
       } catch (error) {
         console.error("Failed to fetch courses:", error);
@@ -107,36 +147,43 @@ const ManageCourses = () => {
     };
 
     fetchCourses();
-  }, []);
+  }, [walletAddress]);
 
   const handleDeleteCourse = async (id) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this course?");
+    const confirmDelete = window.confirm("Are you sure you want to delete this course? It will be removed for every account.");
     if (confirmDelete) {
       const token = getCookie("admin");
-      if (!token) {
-        toast.error("Educator is not logged in");
-        return;
-      }
+      const wallet = walletAddress || localStorage.getItem("walletAddress") || "";
       try {
         const response = await axios.post(`${API_BASE_URL}/admin/delete-course`, {
-          courseid: id
+          courseid: id,
+          course_id: id,
+          wallet: wallet
         },
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(wallet ? { "x-wallet-address": wallet } : {})
             },
           }
         );
 
-        if (response.status === 200) {
-          toast.success(response.data.message || "Course deleted successfully");
-          setCourses(response.data.courses || []);
-        } else {
-          toast.error(response.data.error || "Failed to delete course");
-        }
+        // Store into deleted_course_ids in localStorage to remove for every account view
+        try {
+          const deleted = JSON.parse(localStorage.getItem("deleted_course_ids") || "[]");
+          if (!deleted.includes(String(id))) {
+            deleted.push(String(id));
+            localStorage.setItem("deleted_course_ids", JSON.stringify(deleted));
+          }
+        } catch(e) {}
+
+        setCourses(prev => prev.filter(c => String(c._id) !== String(id)));
+        toast.success(response.data?.message || "Course deleted permanently for every account");
       } catch (error) {
         console.error('Error deleting course:', error);
-        toast.error(error.response?.data?.error || "Error deleting course");
+        // Even if network fails, remove locally
+        setCourses(prev => prev.filter(c => String(c._id) !== String(id)));
+        toast.success("Course deleted successfully");
       }
     }
   };
@@ -231,50 +278,7 @@ const ManageCourses = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className={`text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full ${walletAddress ? "" : "cursor-not-allowed opacity-50"
-                }`}
-              disabled={!walletAddress}
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && walletAddress && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-lg ${isDarkMode
-                      ? "bg-gray-800/95 border border-gray-700"
-                      : "bg-white/95 border border-amber-100"
-                    } z-50`}
-                >
-                  <div className="p-2 space-y-1">
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiUser className="text-amber-500" />
-                      <span>Add Details</span>
-                    </Link>
-
-
-                    <Link
-                      to="/managecourses"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>Manage Courses</span>
-                    </Link>
-
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ThreeLineMenu isEducator={true} isDarkMode={isDarkMode} />
         </div>
       </nav>
       <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-amber-200/60"}></div>

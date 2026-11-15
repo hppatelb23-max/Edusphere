@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef,Component } from 'react';
 import { FaSun, FaMoon, FaSpinner } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiCopy, FiUser, FiDollarSign, FiBook, FiGift } from 'react-icons/fi';
 import { useWallet } from "../context/WalletProvider";
@@ -42,12 +42,6 @@ class DropdownMenu extends Component {
         }`}
       >
         <ul className="p-2 space-y-1">
-          <DropdownItem
-            label="Add Details"
-            isDarkMode={isDarkMode}
-            disabled={!isWalletConnected}
-            onClick={() => console.log('Add Details')}
-          />
           <DropdownItem
             label="Coins"
             isDarkMode={isDarkMode}
@@ -162,6 +156,10 @@ const Contest = () => {
 
    
 
+    if (isEducator) {
+      return <Navigate to="/educatorhome" replace />;
+    }
+
     return (
       <div className={`min-h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gradient-to-br from-yellow-50 to-amber-100'}`}>
       
@@ -189,10 +187,12 @@ const Contest = () => {
               Tests
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
+            {!isEducator && (
                                   <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
                                     Contest
                                     <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
                                   </Link>
+            )}
                  </div>
        
                  {/* Wallet Button */}
@@ -255,25 +255,11 @@ const Contest = () => {
                        >
                          <div className="p-2 space-y-1">
                            <Link
-                             to="/signup"
-                             className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                           >
-                             <FiUser className="text-amber-500" />
-                             <span>Add Details</span>
-                           </Link>
-                           <Link
                              to="/coins"
                              className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
                            >
                              <FiDollarSign className="text-amber-500" />
                              <span>Coins</span>
-                           </Link>
-                           <Link
-                             to="/transaction"
-                             className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                           >
-                             <FiDollarSign className="text-amber-500" />
-                             <span>Transactions</span>
                            </Link>
                            <Link
                              to="/mylearning"

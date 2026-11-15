@@ -4,37 +4,37 @@ const CourseSchema = new mongoose.Schema({
     title:
     {
         type: String,
-        required:true,
-    } , 
+        required: true,
+    },
     description:
     {
         type: String,
-        required:true
+        required: true
     },
     author_name:
     {
         type: String,
-        required:true
+        required: true
     },
-    author_wallet_id:{
-        type:String,
-        required:true
+    author_wallet_id: {
+        type: String,
+        required: true
     },
     category:
-    [{
-        type: String,
-        required:true
-    }],
+        [{
+            type: String,
+            required: true
+        }],
     course_points:
     {
         type: Number,
-        default:100
+        default: 100
     },
-    
+
     course_price:
     {
         type: Number,
-        required:true
+        required: true
     },
     currency:
     {
@@ -56,21 +56,29 @@ const CourseSchema = new mongoose.Schema({
         type: String,
         default: "9969170089@upi"
     },
-    
+
     buy_count:
     {
         type: Number,
-        default:0
+        default: 0
     },
-    course_image:{
+    course_image: {
         type: String,
-        required:true
+        required: true
     },
-    course_video:[{
+    is_delisted: {
+        type: Boolean,
+        default: false
+    },
+    is_deleted_by_author: {
+        type: Boolean,
+        default: false
+    },
+    course_video: [{
         type: String,
-        required:true
+        required: true
     }]
-} , {
+}, {
     timestamps: true
 });
 

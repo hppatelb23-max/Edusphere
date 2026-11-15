@@ -130,7 +130,8 @@ const Edusphere = () => {
       linkedin: 'https://linkedin.com',
       instagram: 'https://instagram.com',
       description: 'A passionate developer with expertise in Frontend Development.',
-      imagePosition: 'object-center'
+      imagePosition: 'object-top',
+      style: { objectPosition: 'center 0%' }
     },
     {
       name: "Harsh Pimple",
@@ -495,7 +496,7 @@ const Edusphere = () => {
                           src={contact.image}
                           alt={contact.name}
                           className={`w-80 h-full ${contact.imagePosition || "object-top"} object-cover rounded-4xl`}
-                          style={{ objectPosition: contact.imagePosition === "object-center" ? "center" : undefined }}
+                          style={contact.style || (contact.imagePosition === "object-center" ? { objectPosition: "center" } : { objectPosition: "center 0%" })}
                         />
                       </div>
                       <h3 className="text-2xl text-black font-bold mb-2">{contact.name}</h3>
@@ -572,7 +573,7 @@ const Edusphere = () => {
                         src={selectedContact.image}
                         alt={selectedContact.name}
                         className={`w-full h-full object-cover ${selectedContact.imagePosition || "object-top"}`}
-                        style={{ objectPosition: selectedContact.imagePosition === "object-center" ? "center" : undefined }}
+                        style={selectedContact.style || (selectedContact.imagePosition === "object-center" ? { objectPosition: "center" } : { objectPosition: "center 0%" })}
                       />
                     </div>
 

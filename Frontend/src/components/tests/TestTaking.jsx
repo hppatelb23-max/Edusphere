@@ -31,6 +31,8 @@ import { useWallet } from "../../context/WalletProvider";
 import { useThemeStore } from "../../store/themeStore";
 import { fetchTestById, submitTestAnswers } from "../../utils/testsApi";
 import { saveProctorRecording } from "../../utils/proctorRecordingDB";
+import { API_BASE_URL } from "../../utils/api";
+import { gradeTestSubmissionLocally, saveSubmissionLocally } from "../../utils/dummyTests";
 import ImageZoomModal from "./ImageZoomModal";
 
 const TestTaking = () => {
@@ -55,6 +57,7 @@ const TestTaking = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [testResult, setTestResult] = useState(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [showPassCoinPopup, setShowPassCoinPopup] = useState(false);
   const [showCheatingWarning, setShowCheatingWarning] = useState(false);
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
   const [zoomImage, setZoomImage] = useState(null); // { src, alt } for zoom modal
@@ -79,21 +82,257 @@ const TestTaking = () => {
   const proctorLogsRef = useRef([]);
   const lastWasCheatingRef = useRef(false);
   const selectedAnswersRef = useRef({});
+  const timeLeftRef = useRef(timeLeft);
+  const currentIndexRef = useRef(currentIndex);
+  const isResumedSessionRef = useRef(false);
+  const part1RecordingIdRef = useRef("");
+
+  useEffect(() => {
+    timeLeftRef.current = timeLeft;
+  }, [timeLeft]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  // Pause test and persist when tab closes or device shuts down
+  const pauseTestOnExit = (overrideAnswers) => {
+    if (phase !== "test") return;
+
+    try {
+      let savedLocalAnswers = {};
+      try {
+        const rawLocal = localStorage.getItem(`edusphere_test_answers_${id}`);
+        if (rawLocal) savedLocal = JSON.parse(rawLocal) || {};
+      } catch (e) {}
+
+      let sessionAnswers = {};
+      try {
+        const rawSess = sessionStorage.getItem(`test_answers_${id}`);
+        if (rawSess) sessionAnswers = JSON.parse(rawSess) || {};
+      } catch (e) {}
+
+      const liveAnswers = {
+        ...savedLocalAnswers,
+        ...sessionAnswers,
+        ...selectedAnswers,
+        ...(selectedAnswersRef.current || {}),
+        ...(overrideAnswers || {})
+      };
+
+      const studentName =
+        localStorage.getItem("username") ||
+        localStorage.getItem("studentName") ||
+        localStorage.getItem("name") ||
+        (walletAddress ? localStorage.getItem(`student_name_${walletAddress.toLowerCase()}`) : "") ||
+        "";
+
+      // If recording chunks exist and we are in the initial session, persist Part 1 to IndexedDB
+      if (!isResumedSessionRef.current && recordedChunksRef.current && recordedChunksRef.current.length > 0) {
+        if (!part1RecordingIdRef.current) {
+          part1RecordingIdRef.current = `rec_${test?._id || id}_${walletAddress ? walletAddress.slice(0, 8) : "stu"}_part1_${Date.now()}`;
+        }
+        try {
+          const vBlob = new Blob(recordedChunksRef.current, { type: "video/webm" });
+          saveProctorRecording(part1RecordingIdRef.current, vBlob, {
+            test_id: test?._id || id,
+            test_title: test?.title || "Assessment",
+            student_wallet_id: walletAddress || "guest_student",
+            part: 1,
+            part_label: "Part 1 (Before Tab Close / Shutdown)",
+            created_at: new Date().toISOString()
+          });
+        } catch (recErr) {
+          console.warn("Error saving Part 1 proctor recording:", recErr);
+        }
+      }
+
+      const pausedRecord = {
+        test_id: test?._id || id,
+        test_title: test?.title || "Assessment",
+        student_wallet_id: (walletAddress || "guest_student").toLowerCase(),
+        student_name: studentName,
+        timeLeft: timeLeftRef.current !== undefined ? timeLeftRef.current : timeLeft,
+        selectedAnswers: liveAnswers,
+        currentIndex: currentIndexRef.current !== undefined ? currentIndexRef.current : currentIndex,
+        questions: questions || [],
+        totalQuestions: (questions || []).length,
+        paused_at: new Date().toISOString(),
+        is_paused: true,
+        part1_recording_id: part1RecordingIdRef.current || ""
+      };
+
+      localStorage.setItem("edusphere_active_paused_test", JSON.stringify(pausedRecord));
+      if (walletAddress) {
+        localStorage.setItem(`edusphere_paused_test_${walletAddress.toLowerCase()}`, JSON.stringify(pausedRecord));
+        localStorage.setItem(`edusphere_test_answers_${id}_${walletAddress.toLowerCase()}`, JSON.stringify(liveAnswers));
+      }
+      if (studentName) {
+        localStorage.setItem(`edusphere_paused_test_${studentName.toLowerCase()}`, JSON.stringify(pausedRecord));
+        localStorage.setItem(`edusphere_test_answers_${id}_${studentName.toLowerCase()}`, JSON.stringify(liveAnswers));
+      }
+      localStorage.setItem(`edusphere_test_answers_${id}`, JSON.stringify(liveAnswers));
+      window.dispatchEvent(new Event("edusphere_test_paused_change"));
+    } catch (err) {
+      console.warn("Pause test error:", err);
+    }
+  };
+
+  // Keep paused state continuously synchronized during active test
+  useEffect(() => {
+    if (phase === "test" && timeLeft > 0) {
+      pauseTestOnExit();
+    }
+  }, [timeLeft, phase, selectedAnswers, currentIndex]);
+
+  // ── Lock Dashboard Navigation & Pause on Tab Close / Shutdown ──
+  useEffect(() => {
+    if (phase === "test") {
+      // Prevent browser back navigation
+      window.history.pushState(null, null, window.location.href);
+
+      const handlePopState = () => {
+        window.history.pushState(null, null, window.location.href);
+        toast.warn("⚠️ You cannot go back to the dashboard! You must submit the test first.");
+      };
+
+      const handleBeforeUnload = (e) => {
+        pauseTestOnExit();
+        e.preventDefault();
+        e.returnValue = "You have an active test. Your progress has been paused!";
+        return e.returnValue;
+      };
+
+      const handlePageHide = () => {
+        pauseTestOnExit();
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      window.addEventListener("beforeunload", handleBeforeUnload);
+      window.addEventListener("pagehide", handlePageHide);
+
+      return () => {
+        window.removeEventListener("popstate", handlePopState);
+        window.removeEventListener("beforeunload", handleBeforeUnload);
+        window.removeEventListener("pagehide", handlePageHide);
+      };
+    }
+  }, [phase, test, questions, walletAddress]);
 
   // Load test details
   const loadTest = async () => {
     setLoading(true);
     try {
-      // randomize=true picks random questions from the bank
-      const data = await fetchTestById(id, true);
+      // Look up if this test has a saved paused record
+      const studentName =
+        localStorage.getItem("username") ||
+        localStorage.getItem("studentName") ||
+        localStorage.getItem("name") ||
+        "";
+      const keyWallet = walletAddress ? `edusphere_paused_test_${walletAddress.toLowerCase()}` : "";
+      const keyName = studentName ? `edusphere_paused_test_${studentName.toLowerCase()}` : "";
+
+      let pausedRecord = null;
+      try {
+        const rawActive = localStorage.getItem("edusphere_active_paused_test");
+        const rawWallet = keyWallet ? localStorage.getItem(keyWallet) : null;
+        const rawName = keyName ? localStorage.getItem(keyName) : null;
+
+        const candidate = rawWallet
+          ? JSON.parse(rawWallet)
+          : rawName
+          ? JSON.parse(rawName)
+          : rawActive
+          ? JSON.parse(rawActive)
+          : null;
+
+        if (
+          candidate &&
+          candidate.is_paused &&
+          (String(candidate.test_id) === String(id) || !id || candidate.test_id === test?._id)
+        ) {
+          pausedRecord = candidate;
+        }
+      } catch (e) {}
+
+      // If test was paused with saved questions, do not re-randomize
+      const data = await fetchTestById(id, pausedRecord ? false : true);
       if (!data) {
         toast.error("Test not found");
         navigate("/tests");
         return;
       }
+
+      // Check schedule window if test is scheduled
+      if (data.test_type === "scheduled" && data.schedule_start && data.schedule_end) {
+        const nowMs = Date.now();
+        const startMs = new Date(data.schedule_start).getTime();
+        const endMs = new Date(data.schedule_end).getTime();
+
+        if (nowMs < startMs) {
+          toast.warn(`🕒 This assessment is scheduled from ${new Date(data.schedule_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} to ${new Date(data.schedule_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. It has not started yet.`);
+          navigate("/tests");
+          return;
+        }
+
+        if (nowMs > endMs) {
+          toast.error(`❌ The scheduled window for this assessment ended at ${new Date(data.schedule_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. You can no longer take this test.`);
+          navigate("/tests");
+          return;
+        }
+      }
+
+      if (pausedRecord && Array.isArray(pausedRecord.questions) && pausedRecord.questions.length > 0) {
+        data.questions = pausedRecord.questions;
+      }
+
       setTest(data);
       setQuestions(data.questions || []);
-      setTimeLeft((data.duration_minutes || 15) * 60);
+
+      const windowRemainingSecs = (data.test_type === "scheduled" && data.schedule_end)
+        ? Math.max(0, Math.floor((new Date(data.schedule_end).getTime() - Date.now()) / 1000))
+        : Infinity;
+
+      // Retrieve any persisted answers from localStorage so answered MCQs are never lost
+      let localSavedAnswers = {};
+      try {
+        const rawL = (walletAddress ? localStorage.getItem(`edusphere_test_answers_${id}_${walletAddress.toLowerCase()}`) : null) ||
+                     (studentName ? localStorage.getItem(`edusphere_test_answers_${id}_${studentName.toLowerCase()}`) : null) ||
+                     localStorage.getItem(`edusphere_test_answers_${id}`) ||
+                     sessionStorage.getItem(`test_answers_${id}`);
+        if (rawL) localSavedAnswers = JSON.parse(rawL) || {};
+      } catch (e) {}
+
+      if (pausedRecord) {
+        if (pausedRecord.part1_recording_id) {
+          part1RecordingIdRef.current = pausedRecord.part1_recording_id;
+          isResumedSessionRef.current = true;
+        }
+        let restoredTime = typeof pausedRecord.timeLeft === "number" ? pausedRecord.timeLeft : (data.duration_minutes || 15) * 60;
+        if (windowRemainingSecs !== Infinity) {
+          restoredTime = Math.min(restoredTime, windowRemainingSecs);
+        }
+        setTimeLeft(restoredTime);
+        const restoredAnswers = {
+          ...localSavedAnswers,
+          ...(pausedRecord.selectedAnswers || {})
+        };
+        setSelectedAnswers(restoredAnswers);
+        selectedAnswersRef.current = restoredAnswers;
+        setCurrentIndex(pausedRecord.currentIndex || 0);
+        setPhase("camera");
+        toast.info("⏸️ Test Resumed: Please verify your camera proctoring to continue your paused test.");
+      } else {
+        let initTime = (data.duration_minutes || 15) * 60;
+        if (windowRemainingSecs !== Infinity) {
+          initTime = Math.min(initTime, windowRemainingSecs);
+        }
+        setTimeLeft(initTime);
+        if (Object.keys(localSavedAnswers).length > 0) {
+          setSelectedAnswers(localSavedAnswers);
+          selectedAnswersRef.current = localSavedAnswers;
+        }
+      }
     } catch (err) {
       console.error("Error loading test:", err);
       toast.error("Failed to load test details");
@@ -160,6 +399,17 @@ const TestTaking = () => {
     if (phase === "test" && timeLeft > 0) {
       timerRef.current = setInterval(() => {
         setTimeLeft((prev) => {
+          // If scheduled assessment, auto-submit when the window deadline expires
+          if (test && test.test_type === "scheduled" && test.schedule_end) {
+            const endMs = new Date(test.schedule_end).getTime();
+            if (Date.now() >= endMs) {
+              clearInterval(timerRef.current);
+              toast.info("The scheduled test window has ended! Submitting your answers automatically...");
+              handleSubmitTest();
+              return 0;
+            }
+          }
+
           if (prev <= 1) {
             clearInterval(timerRef.current);
             handleAutoSubmit();
@@ -173,7 +423,7 @@ const TestTaking = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [phase, timeLeft]);
+  }, [phase, timeLeft, test]);
 
   // Format seconds to MM:SS
   const formatTime = (secs) => {
@@ -384,18 +634,30 @@ const TestTaking = () => {
     const qId = currentQ._id ? String(currentQ._id) : (currentQ.id ? String(currentQ.id) : "");
     const qText = (currentQ.question || "").trim();
 
-    setSelectedAnswers((prev) => {
-      const next = {
-        ...prev,
-        [currentIndex]: optionIndex,
-        [String(currentIndex)]: optionIndex,
-        ...(qId ? { [qId]: optionIndex } : {}),
-        ...(qText ? { [qText]: optionIndex } : {}),
-        ...(currentQ.question ? { [currentQ.question]: optionIndex } : {})
-      };
-      selectedAnswersRef.current = next;
-      return next;
-    });
+    const next = {
+      ...selectedAnswers,
+      ...(selectedAnswersRef.current || {}),
+      [currentIndex]: optionIndex,
+      [String(currentIndex)]: optionIndex,
+      ...(qId ? { [qId]: optionIndex } : {}),
+      ...(qText ? { [qText]: optionIndex } : {}),
+      ...(currentQ.question ? { [currentQ.question]: optionIndex } : "")
+    };
+    selectedAnswersRef.current = next;
+    setSelectedAnswers(next);
+
+    try {
+      sessionStorage.setItem(`test_answers_${id}`, JSON.stringify(next));
+      localStorage.setItem(`edusphere_test_answers_${id}`, JSON.stringify(next));
+      if (walletAddress) {
+        localStorage.setItem(`edusphere_test_answers_${id}_${walletAddress.toLowerCase()}`, JSON.stringify(next));
+      }
+      const sName = localStorage.getItem("username") || localStorage.getItem("studentName") || "";
+      if (sName) {
+        localStorage.setItem(`edusphere_test_answers_${id}_${sName.toLowerCase()}`, JSON.stringify(next));
+      }
+      pauseTestOnExit(next);
+    } catch (e) {}
   };
 
   // Clear current question selection
@@ -404,16 +666,27 @@ const TestTaking = () => {
     const qId = currentQ._id ? String(currentQ._id) : (currentQ.id ? String(currentQ.id) : "");
     const qText = (currentQ.question || "").trim();
 
-    setSelectedAnswers((prev) => {
-      const copy = { ...prev };
-      delete copy[currentIndex];
-      delete copy[String(currentIndex)];
-      if (qId) delete copy[qId];
-      if (qText) delete copy[qText];
-      if (currentQ.question) delete copy[currentQ.question];
-      selectedAnswersRef.current = copy;
-      return copy;
-    });
+    const copy = { ...selectedAnswers, ...(selectedAnswersRef.current || {}) };
+    delete copy[currentIndex];
+    delete copy[String(currentIndex)];
+    if (qId) delete copy[qId];
+    if (qText) delete copy[qText];
+    if (currentQ.question) delete copy[currentQ.question];
+    selectedAnswersRef.current = copy;
+    setSelectedAnswers(copy);
+
+    try {
+      sessionStorage.setItem(`test_answers_${id}`, JSON.stringify(copy));
+      localStorage.setItem(`edusphere_test_answers_${id}`, JSON.stringify(copy));
+      if (walletAddress) {
+        localStorage.setItem(`edusphere_test_answers_${id}_${walletAddress.toLowerCase()}`, JSON.stringify(copy));
+      }
+      const sName = localStorage.getItem("username") || localStorage.getItem("studentName") || "";
+      if (sName) {
+        localStorage.setItem(`edusphere_test_answers_${id}_${sName.toLowerCase()}`, JSON.stringify(copy));
+      }
+      pauseTestOnExit(copy);
+    } catch (e) {}
   };
 
   // Toggle flag for review
@@ -478,39 +751,68 @@ const TestTaking = () => {
 
       // 2. Save video recording to IndexedDB (accessible only by educators)
       let recordingId = "";
+      let part2Id = "";
       if (recordedChunksRef.current && recordedChunksRef.current.length > 0) {
         try {
           const videoBlob = new Blob(recordedChunksRef.current, { type: "video/webm" });
-          recordingId = `rec_${test._id}_${walletAddress ? walletAddress.slice(0, 8) : "stu"}_${Date.now()}`;
-          await saveProctorRecording(recordingId, videoBlob, {
-            test_id: test._id,
-            test_title: test.title,
-            student_wallet_id: walletAddress || "guest_student",
-            logs: proctorLogsRef.current || [],
-            violations_count: proctorLogsRef.current.length,
-            duration_seconds: (test.duration_minutes || 15) * 60 - timeLeft
-          });
+          if (isResumedSessionRef.current && part1RecordingIdRef.current) {
+            part2Id = `rec_${test._id}_${walletAddress ? walletAddress.slice(0, 8) : "stu"}_part2_${Date.now()}`;
+            recordingId = part2Id;
+            await saveProctorRecording(part2Id, videoBlob, {
+              test_id: test._id,
+              test_title: test.title,
+              student_wallet_id: walletAddress || "guest_student",
+              part: 2,
+              part_label: "Part 2 (After Resumption / Final)",
+              logs: proctorLogsRef.current || [],
+              violations_count: proctorLogsRef.current.length,
+              duration_seconds: (test.duration_minutes || 15) * 60 - timeLeft
+            });
+          } else {
+            recordingId = `rec_${test._id}_${walletAddress ? walletAddress.slice(0, 8) : "stu"}_${Date.now()}`;
+            await saveProctorRecording(recordingId, videoBlob, {
+              test_id: test._id,
+              test_title: test.title,
+              student_wallet_id: walletAddress || "guest_student",
+              part: 1,
+              part_label: "Complete Proctoring Recording",
+              logs: proctorLogsRef.current || [],
+              violations_count: proctorLogsRef.current.length,
+              duration_seconds: (test.duration_minutes || 15) * 60 - timeLeft
+            });
+          }
         } catch (err) {
           console.warn("Failed to persist proctor recording:", err);
         }
       }
 
-      const liveAnswers = { ...selectedAnswers, ...(selectedAnswersRef.current || {}) };
+      let sessionAnswers = {};
+      try {
+        const rawSess = sessionStorage.getItem(`test_answers_${id}`);
+        if (rawSess) sessionAnswers = JSON.parse(rawSess) || {};
+      } catch (e) {}
+
+      const liveAnswers = {
+        ...sessionAnswers,
+        ...selectedAnswers,
+        ...(selectedAnswersRef.current || {})
+      };
+
       const answersPayload = questions.map((q, idx) => {
         const qId = q._id ? String(q._id) : (q.id ? String(q.id) : "");
         const qText = (q.question || "").trim();
 
         let selected = -1;
-        if (liveAnswers[idx] !== undefined) {
-          selected = liveAnswers[idx];
-        } else if (liveAnswers[String(idx)] !== undefined) {
-          selected = liveAnswers[String(idx)];
-        } else if (qId && liveAnswers[qId] !== undefined) {
-          selected = liveAnswers[qId];
-        } else if (qText && liveAnswers[qText] !== undefined) {
-          selected = liveAnswers[qText];
-        } else if (q.question && liveAnswers[q.question] !== undefined) {
-          selected = liveAnswers[q.question];
+        if (liveAnswers[idx] !== undefined && liveAnswers[idx] !== null) {
+          selected = Number(liveAnswers[idx]);
+        } else if (liveAnswers[String(idx)] !== undefined && liveAnswers[String(idx)] !== null) {
+          selected = Number(liveAnswers[String(idx)]);
+        } else if (qId && liveAnswers[qId] !== undefined && liveAnswers[qId] !== null) {
+          selected = Number(liveAnswers[qId]);
+        } else if (qText && liveAnswers[qText] !== undefined && liveAnswers[qText] !== null) {
+          selected = Number(liveAnswers[qText]);
+        } else if (q.question && liveAnswers[q.question] !== undefined && liveAnswers[q.question] !== null) {
+          selected = Number(liveAnswers[q.question]);
         }
 
         // Final fallback: look through all keys
@@ -521,19 +823,23 @@ const TestTaking = () => {
               (qId && String(k) === qId) ||
               (qText && String(k).trim().toLowerCase() === qText.toLowerCase())
             ) {
-              selected = v;
+              selected = Number(v);
               break;
             }
           }
         }
 
+        const optionsList = Array.isArray(q.options) ? q.options : [];
+        const selectedText = (selected >= 0 && optionsList[selected]) ? String(optionsList[selected]) : "";
+
         return {
           question_id: q._id || q.question || `q_${idx}`,
           question: q.question || "",
           question_image: q.question_image || "",
-          options: q.options || [],
+          options: optionsList,
           option_images: q.option_images || [],
           selected_option: selected,
+          selected_option_text: selectedText,
           question_index: idx
         };
       });
@@ -549,14 +855,45 @@ const TestTaking = () => {
         student_wallet_id: walletAddress || "guest_student",
         student_name: studentName,
         answers: answersPayload,
-        recording_id: recordingId,
+        recording_id: recordingId || part2Id || part1RecordingIdRef.current || "",
+        recording_id_part1: part1RecordingIdRef.current || "",
+        recording_id_part2: part2Id || (isResumedSessionRef.current ? recordingId : ""),
+        has_interruption: Boolean(part1RecordingIdRef.current),
         proctor_logs: proctorLogsRef.current || []
       });
 
       if (res.success && res.result) {
+        // Clear paused state from storage upon successful test submission
+        try {
+          localStorage.removeItem("edusphere_active_paused_test");
+          if (walletAddress) {
+            localStorage.removeItem(`edusphere_paused_test_${walletAddress.toLowerCase()}`);
+          }
+          const sName =
+            localStorage.getItem("username") ||
+            localStorage.getItem("studentName") ||
+            localStorage.getItem("name") ||
+            "";
+          if (sName) {
+            localStorage.removeItem(`edusphere_paused_test_${sName.toLowerCase()}`);
+          }
+          sessionStorage.removeItem(`test_answers_${id}`);
+          sessionStorage.removeItem(`test_answers_${test?._id}`);
+          window.dispatchEvent(new Event("edusphere_test_paused_change"));
+        } catch (e) {}
+
         setTestResult(res.result);
         setPhase("results");
-        toast.success("Assessment submitted successfully! Proctor recording stored.");
+        if (res.result.passed) {
+          try {
+            const currentCoins = Number(localStorage.getItem("student_coins") || 500);
+            localStorage.setItem("student_coins", String(currentCoins + 50));
+          } catch (e) {}
+          setShowPassCoinPopup(true);
+          toast.success("🎉 Congratulations! You have won 50 coins!");
+        } else {
+          toast.success("Assessment submitted successfully! Proctor recording stored.");
+        }
       } else {
         toast.error("Error submitting test. Please try again.");
       }
@@ -570,6 +907,23 @@ const TestTaking = () => {
 
   // Retake test (re-pulls random questions from bank)
   const handleRetakeTest = async () => {
+    try {
+      localStorage.removeItem("edusphere_active_paused_test");
+      if (walletAddress) {
+        localStorage.removeItem(`edusphere_paused_test_${walletAddress.toLowerCase()}`);
+      }
+      const sName =
+        localStorage.getItem("username") ||
+        localStorage.getItem("studentName") ||
+        localStorage.getItem("name") ||
+        "";
+      if (sName) {
+        localStorage.removeItem(`edusphere_paused_test_${sName.toLowerCase()}`);
+      }
+      sessionStorage.removeItem(`test_answers_${id}`);
+      window.dispatchEvent(new Event("edusphere_test_paused_change"));
+    } catch (e) {}
+
     setSelectedAnswers({});
     selectedAnswersRef.current = {};
     setFlaggedQuestions({});
@@ -1467,16 +1821,53 @@ const TestTaking = () => {
                       return found !== -1 ? found : -1;
                     };
 
-                    const correctOptIdx = resolveOptIdx(item.correct_option);
-                    const selectedOptIdx = resolveOptIdx(item.selected_option);
+                    let correctOptIdx = resolveOptIdx(item.correct_option);
+                    let selectedOptIdx = resolveOptIdx(item.selected_option);
 
-                    // Re-evaluate correctness accurately
+                    // Match by text if index was not resolved
+                    if (selectedOptIdx === -1 && item.selected_option_text) {
+                      const textMatch = optionsList.findIndex(
+                        (o) => String(o).trim().toLowerCase() === String(item.selected_option_text).trim().toLowerCase()
+                      );
+                      if (textMatch !== -1) selectedOptIdx = textMatch;
+                    }
+
+                    // Fallback to checking local session answers if still -1
+                    if (selectedOptIdx === -1) {
+                      try {
+                        const raw = sessionStorage.getItem(`test_answers_${id}`);
+                        const parsed = raw ? JSON.parse(raw) : null;
+                        if (parsed && (parsed[idx] !== undefined || parsed[String(idx)] !== undefined)) {
+                          const val = parsed[idx] !== undefined ? parsed[idx] : parsed[String(idx)];
+                          if (val >= 0) selectedOptIdx = Number(val);
+                        }
+                      } catch (e) {}
+                    }
+
+                    // If flagged as correct by grading, ensure selected option matches correct option
+                    if (item.is_correct && selectedOptIdx === -1 && correctOptIdx !== -1) {
+                      selectedOptIdx = correctOptIdx;
+                    }
+
+                    // Verify if text matches
+                    const isTextIdentical =
+                      selectedOptIdx !== -1 &&
+                      correctOptIdx !== -1 &&
+                      optionsList[selectedOptIdx] &&
+                      optionsList[correctOptIdx] &&
+                      String(optionsList[selectedOptIdx]).trim().toLowerCase() ===
+                        String(optionsList[correctOptIdx]).trim().toLowerCase();
+
                     const isCorrect =
-                      correctOptIdx !== -1 && selectedOptIdx !== -1
-                        ? correctOptIdx === selectedOptIdx
-                        : Boolean(item.is_correct);
+                      Boolean(item.is_correct) ||
+                      (correctOptIdx !== -1 && selectedOptIdx !== -1 && correctOptIdx === selectedOptIdx) ||
+                      isTextIdentical;
 
-                    const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : "None";
+                    if (isCorrect && selectedOptIdx === -1 && correctOptIdx !== -1) {
+                      selectedOptIdx = correctOptIdx;
+                    }
+
+                    const studentOptLetter = selectedOptIdx !== -1 ? optionLetters[selectedOptIdx] : null;
                     const studentAnsText = selectedOptIdx !== -1 && optionsList[selectedOptIdx] ? optionsList[selectedOptIdx] : "";
                     const correctOptLetter = correctOptIdx !== -1 ? optionLetters[correctOptIdx] : "A";
                     const correctAnsText = correctOptIdx !== -1 && optionsList[correctOptIdx] ? optionsList[correctOptIdx] : "";
@@ -1487,11 +1878,11 @@ const TestTaking = () => {
                         className={`rounded-2xl p-6 border transition-all ${
                           isCorrect
                             ? isDarkMode
-                              ? "bg-emerald-950/20 border-emerald-500/40 shadow-sm"
-                              : "bg-emerald-50/70 border-emerald-300 shadow-sm"
+                              ? "bg-emerald-950/20 border-emerald-500/50 shadow-md shadow-emerald-500/10"
+                              : "bg-emerald-50/80 border-emerald-400 shadow-md shadow-emerald-500/10"
                             : isDarkMode
-                            ? "bg-red-950/25 border-red-500/40 shadow-sm"
-                            : "bg-red-50/70 border-red-300 shadow-sm"
+                            ? "bg-red-950/25 border-red-500/50 shadow-md shadow-red-500/10"
+                            : "bg-red-50/80 border-red-300 shadow-md shadow-red-500/10"
                         }`}
                       >
                         {/* Status bar */}
@@ -1500,10 +1891,10 @@ const TestTaking = () => {
                             Question {idx + 1}
                           </span>
                           <span
-                            className={`text-xs px-3 py-1 rounded-full font-extrabold flex items-center gap-1.5 border shadow-sm ${
+                            className={`text-xs px-3.5 py-1.5 rounded-full font-black flex items-center gap-1.5 border shadow-sm ${
                               isCorrect
-                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50"
-                                : "bg-red-500/20 text-red-400 border-red-500/50"
+                                ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/60"
+                                : "bg-red-500/20 text-red-300 border-red-500/60"
                             }`}
                           >
                             {isCorrect ? (
@@ -1520,20 +1911,31 @@ const TestTaking = () => {
                           </span>
                         </div>
 
-                        {/* Wrong Answer Explanation Banner - Explicitly reveals correct answer */}
-                        {!isCorrect && (
-                          <div className="p-3.5 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                            <div className="flex items-center gap-2 text-red-300">
-                              <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                        {/* Answer Banner: Green for Correct, Red+Green for Wrong */}
+                        {isCorrect ? (
+                          <div className="p-3.5 rounded-2xl bg-emerald-950/50 border border-emerald-500/50 text-xs mb-4 flex items-center gap-2 text-emerald-300 w-full">
+                            <span className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-black text-[11px] shrink-0">
+                              ✓
+                            </span>
+                            <span className="leading-relaxed break-words">
+                              <strong>Your Choice:</strong> {studentOptLetter ? `Option ${studentOptLetter} (${studentAnsText})` : (studentAnsText || `Option ${correctOptLetter}`)} <span className="font-extrabold text-emerald-400">(✓ Correct Solution)</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-xs mb-4 flex flex-col gap-2.5 w-full">
+                            <div className="flex items-start gap-2 text-red-300">
+                              <span className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5">
                                 ✗
                               </span>
-                              <span>
-                                <strong>Your Choice:</strong> Option {studentOptLetter}{studentAnsText ? ` (${studentAnsText})` : ""} <span className="font-extrabold text-red-400">(Incorrect)</span>
+                              <span className="leading-relaxed break-words">
+                                <strong>Your Choice:</strong> {studentOptLetter ? `Option ${studentOptLetter} (${studentAnsText})` : <span className="text-amber-400 font-bold bg-amber-500/20 px-2 py-0.5 rounded border border-amber-400/30">Not Answered / Skipped</span>} <span className="font-extrabold text-red-400">(Incorrect)</span>
                               </span>
                             </div>
-                            <div className="flex items-center gap-1.5 self-start sm:self-auto bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 text-emerald-300 font-extrabold shrink-0">
-                              <FiCheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                              <span>Correct Answer: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}</span>
+                            <div className="flex items-start gap-2 bg-emerald-950/80 p-3 rounded-xl border border-emerald-500/40 text-emerald-300 font-bold w-full leading-relaxed">
+                              <FiCheckCircle className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                              <span className="break-words">
+                                Correct Answer: Option {correctOptLetter}{correctAnsText ? ` (${correctAnsText})` : ""}
+                              </span>
                             </div>
                           </div>
                         )}
@@ -1719,6 +2121,46 @@ const TestTaking = () => {
                     }`}
                 >
                   Cancel & Review Questions
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ============================================================== */}
+      {/* 50 COINS WON CELEBRATORY POPUP MODAL */}
+      {/* ============================================================== */}
+      <AnimatePresence>
+        {showPassCoinPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              className={`max-w-md w-full p-8 rounded-3xl border text-center shadow-2xl relative overflow-hidden ${
+                isDarkMode ? "bg-gray-900 border-amber-500/50" : "bg-white border-amber-300"
+              }`}
+            >
+              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-4xl shadow-lg shadow-amber-500/40">
+                🪙
+              </div>
+              <h3 className="text-2xl font-black mb-1 text-amber-400">
+                Congratulations!
+              </h3>
+              <p className="text-xl font-extrabold mb-3 text-emerald-400">
+                You have won 50 coins!
+              </p>
+              <p className={`text-sm mb-6 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>
+                You passed the assessment above the passing percentage! <strong>50 coins</strong> have been added to your Redeem balance.
+              </p>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowPassCoinPopup(false)}
+                  className="px-8 py-3 rounded-xl font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/30 transition-all cursor-pointer"
+                >
+                  Awesome, View Solutions!
                 </button>
               </div>
             </motion.div>

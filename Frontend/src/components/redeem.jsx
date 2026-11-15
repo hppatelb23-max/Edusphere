@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from "react";
 import { useTheme } from "next-themes";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import {CourseContext, CourseProvider} from "./context"
 import { FiUser, FiDollarSign, FiBook, FiGift, FiCopy } from "react-icons/fi";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,7 @@ import { contractAbi, contractAddress } from "../utils/constants";
 import { useWriteContract, useAccount } from 'wagmi'
 import { toast } from 'react-toastify'
 import { API_BASE_URL, getCookie } from "../utils/api";
+import ThreeLineMenu from "./ThreeLineMenu";
 
 const RedeemPage = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -19,7 +20,10 @@ const RedeemPage = () => {
   const setIsDarkMode = useThemeStore((state) => state.setIsDarkMode);
   const [account, setAccount] = useState(null);
   const { walletAddress, walletConnected, connectWallet } = useWallet();
-  const [coins, setCoins] = useState(0);
+  const [coins, setCoins] = useState(() => {
+    const saved = localStorage.getItem("student_coins");
+    return saved !== null && saved !== undefined ? Number(saved) : 500;
+  });
   const {
     redeemCoins,
   } = useContext(CourseContext);
@@ -29,6 +33,10 @@ const RedeemPage = () => {
 
   const dropdownRef = useRef(null);
   const isEducator = localStorage.getItem("role") === "educator";
+
+  if (isEducator) {
+    return <Navigate to="/educatorhome" replace />;
+  }
 
   useEffect(() => {
     const fetchCoins = async () => {
@@ -44,6 +52,7 @@ const RedeemPage = () => {
 
         if (response.status === 200 && response.data?.coins !== undefined) {
           setCoins(response.data.coins);
+          localStorage.setItem("student_coins", String(response.data.coins));
         }
       } catch (error) {
         console.warn("Error fetching coins:", error);
@@ -188,10 +197,12 @@ const RedeemPage = () => {
               Courses
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
-              Contest
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
-            </Link>
+            {!isEducator && (
+              <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+                Contest
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
+              </Link>
+            )}
           </div>
 
           {/* Wallet Button */}
@@ -233,60 +244,7 @@ const RedeemPage = () => {
             {isDarkMode ? "🌙" : "☀️"}
           </button>
 
-          {/* Dropdown Menu */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              onClick={toggleDropdown}
-              className={`text-lg bg-gradient-to-r from-amber-500 to-amber-300 text-black py-2 px-4 rounded-full ${walletAddress ? "" : "cursor-not-allowed opacity-50"
-                }`}
-              disabled={!walletAddress}
-            >
-              ☰
-            </button>
-            <AnimatePresence>
-              {dropdownOpen && walletAddress && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className={`absolute right-0 mt-2 w-64 origin-top-right rounded-xl shadow-xl backdrop-blur-lg ${isDarkMode ? "bg-gray-800/95 border border-gray-700" : "bg-white/95 border border-amber-100"
-                    } z-50`}
-                >
-                  <div className="p-2 space-y-1">
-                    <Link
-                      to="/signup"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiUser className="text-amber-500" />
-                      <span>Add Details</span>
-                    </Link>
-                    
-                    <Link
-                      to="/transaction"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiDollarSign className="text-amber-500" />
-                      <span>Transactions</span>
-                    </Link>
-                    <Link
-                      to="/mylearning"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiBook className="text-amber-500" />
-                      <span>My Learning</span>
-                    </Link>
-                    <Link
-                      to="/redeem"
-                      className="flex items-center space-x-3 p-3 rounded-lg hover:bg-amber-500/10 transition-colors"
-                    >
-                      <FiGift className="text-amber-500" />
-                      <span>Redeem</span>
-                    </Link>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          <ThreeLineMenu isEducator={false} isDarkMode={isDarkMode} />
         </div>
       </nav>
       <div className="border-b-4 border-gold"></div>

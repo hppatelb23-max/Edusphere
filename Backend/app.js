@@ -36,6 +36,10 @@ app.use(express.urlencoded({ extended: true, limit: '100mb' }))
 
 
 //routes
+const { DisplayEducatorTransactions } = require("./Controllers/user");
+const { optional_login_user } = require("./Middlewares/login_user");
+app.get("/educator-transactions", optional_login_user, DisplayEducatorTransactions);
+
 app.use("/user" , user_router)
 app.use("/admin" , admin_router)
 app.use('/courses' , course_router)

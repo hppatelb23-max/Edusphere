@@ -8,6 +8,12 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required:true
     },
+
+    locked_account_name:
+    {
+        type: String,
+        default: null
+    },
     
     metamask_wallet_id:
     {
@@ -23,19 +29,19 @@ const UserSchema = new mongoose.Schema({
     coins:
     {
         type: Number,
-        default:100
+        default: 500
     },
     
     demo_upi_balance:
     {
         type: Number,
-        default: 1000
+        default: 0
     },
     
     inr_balance:
     {
         type: Number,
-        default: 1000
+        default: 0
     },
     
     badge:
