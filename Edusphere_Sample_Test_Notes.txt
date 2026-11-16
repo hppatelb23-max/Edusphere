@@ -1,0 +1,85 @@
+=== PAGE 1 ===
+EDUSPHERE ACADEMY
+Verified Course Study Notes & Automated Test Dataset | Module 1
+TEST FILE: EDU-01
+Subject: Web3 & Distributed Systems Architecture
+Instructor: Prof. Pramila Chawan   |   Format: Core Lecture Notes (Pages 1 & 2)
+Academic Year: 2026
+1. FUNDAMENTALS OF DISTRIBUTED LEDGER TECHNOLOGY
+Blockchain is a decentralized, distributed, and append-only ledger that maintains an immutable record of transactions across a
+peer-to-peer network. Every participant (node) maintains an identical copy of the ledger, eliminating the need for centralized intermediaries.
+Decentralized Consensus:
+Transactions are verified by cryptographic consensus algorithms (e.g. Proof of Stake, Proof of Work) rather than a 
+Cryptographic Hashing:
+Blocks are chained using SHA-256 or Keccak-256 cryptographic hashes. Altering any prior block invalidates all sub
+Merkle Tree Verification:
+Transactions in a block are organized into Merkle Trees, allowing logarithmic O(log n) cryptographic proof of transa
+State Immutability:
+Once confirmed by network consensus, transaction records cannot be modified, deleted, or backdated.
+2. ETHEREUM VIRTUAL MACHINE (EVM) MEMORY & GAS MECHANICS
+The Ethereum Virtual Machine (EVM) is a quasi-Turing complete runtime environment that executes smart contract bytecode.
+Computational operations require Gas payments to prevent infinite loops and denial-of-service.
+Memory Area
+Persistence & Scope
+Gas Cost
+Primary Purpose & Behavior
+Storage
+Permanent (Blockchain State)
+Extremely High (2,100 - 20,000 gas)
+Stores contract state variables between txs.
+Memory
+Temporary (Function Call)
+Low (3 gas + quadratic expansion)
+Holds mutable variables during computation.
+Calldata
+Temporary (Function Call)
+Very Low (Read-only buffer)
+Stores incoming immutable function arguments.
+Stack
+Ephemeral (1024 depth)
+Cheapest (Minimal gas)
+Holds raw 256-bit machine registers.
+3. EIP-1559 TRANSACTION FEE FORMULA
+Total Transaction Fee = Gas Units Consumed * (Base Fee + Priority Fee / Tip)
+Note: The Base Fee is burned protocol-wide, while the Priority Fee (Tip) goes directly to block validators.
+Edusphere Web3 Decentralized LMS  *  https://edusphere.edu
+Page 1 of 2
+
+
+=== PAGE 2 ===
+EDUSPHERE ACADEMY
+Verified Course Study Notes & Automated Test Dataset | Module 2
+TEST FILE: EDU-02
+4. SOLIDITY SECURITY, VULNERABILITIES & BEST PRACTICES
+Reentrancy Attacks:
+Occurs when an external contract call transfers control back to the calling contract before its state (balance) is updated. Defense: Follow the
+Checks-Effects-Interactions (CEI) pattern or use OpenZeppelin ReentrancyGuard nonReentrant modifier.
+Arithmetic Overflow / Underflow:
+In Solidity versions prior to 0.8.0, arithmetic operations silently wrapped around. In Solidity 0.8+, all math operations automatically revert on
+overflow unless wrapped in an explicit unchecked { ... } block.
+Access Control Flaws:
+Failing to restrict administrative functions (e.g. mint, pause, withdraw) allows attackers to drain assets. Defense: Implement strict Ownable or
+AccessControl modifiers like onlyOwner.
+tx.origin Phishing:
+Using tx.origin for authentication allows malicious intermediary contracts to impersonate users. Always authenticate using msg.sender.
+5. ETHEREUM TOKEN STANDARDS (ERC DEFINITIONS)
+ERC-20
+(Fungible Tokens):
+Uniform units where each token has identical value. Uses allowance(owner, spender) to delegate approv
+ERC-721
+(Non-Fungible Tokens (NFTs)): Represents unique, indivisible digital assets where each item is identified by a unique tokenId.
+ERC-1155
+(Multi-Token Standard):
+Hybrid standard supporting batch transfers of fungible and non-fungible items within a single contract.
+6. SAMPLE PRACTICE QUESTIONS FOR TEST EVALUATION
+Q1: Which EVM data area consumes the lowest gas for incoming immutable function arguments?
+A) Storage   B) Memory   C) Calldata   D) Log Topics
+Correct Answer: C (Calldata) | Explanation: Calldata is a read-only byte array allocated for transaction input arguments.
+Q2: What is the primary function modifier pattern used to prevent reentrancy attacks in Solidity?
+A) Checks-Effects-Interactions   B) Fallback Assembly   C) Tx-Origin Guard   D) DelegateCall Loop
+Correct Answer: A (Checks-Effects-Interactions) | Explanation: Updating state balances before external calls stops recursive exploitation.
+Q3: In Solidity 0.8+, how does the EVM natively handle arithmetic overflow (e.g. uint256 max + 1)?
+A) Silently wraps to zero   B) Reverts transaction automatically   C) Emits warning event   D) Halts block execution
+Correct Answer: B (Reverts transaction) | Explanation: Solidity 0.8+ integrates checked arithmetic, triggering automatic Panic(0x11).
+Edusphere Web3 Decentralized LMS  *  https://edusphere.edu
+Page 2 of 2

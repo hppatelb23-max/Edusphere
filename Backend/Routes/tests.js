@@ -9,11 +9,15 @@ const {
     DeleteTest,
     DeleteSubmission,
     DeleteSubmissionRecording,
-    ClearAllSubmissions
+    ClearAllSubmissions,
+    GenerateQuestionsFromNotes,
+    ExtractDocumentText
 } = require("../Controllers/tests");
 
 const router = express.Router();
 
+router.post("/extract-document", ExtractDocumentText);
+router.post("/generate-from-notes", GenerateQuestionsFromNotes);
 router.get("/submissions/all", GetEducatorSubmissions);
 router.get("/submissions/my", GetMySubmissions);
 router.delete("/submissions/recording/:submission_id", DeleteSubmissionRecording);

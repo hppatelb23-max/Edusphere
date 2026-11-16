@@ -16,7 +16,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.123Z",
+    "createdAt": "2026-11-15T17:35:58.266Z",
     "currency": "DUAL",
     "description": "Master smart contract development using Solidity, Hardhat, Ethers.js, and Wagmi. Build production-grade decentralized applications from scratch.",
     "is_deleted_by_author": false,
@@ -24,7 +24,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Full-Stack Web3 & Smart Contract Engineering",
-    "updatedAt": "2026-11-15T12:44:38.123Z",
+    "updatedAt": "2026-11-15T17:35:58.266Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -44,7 +44,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.339Z",
+    "createdAt": "2026-11-15T17:35:58.384Z",
     "currency": "DUAL",
     "description": "Deep dive into Automated Market Makers (AMMs), yield farming, liquidity pools, flash loans, and staking mechanics on Ethereum and Layer 2s.",
     "is_deleted_by_author": false,
@@ -52,7 +52,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Decentralized Finance (DeFi) Protocol Architecture",
-    "updatedAt": "2026-11-15T12:44:38.339Z",
+    "updatedAt": "2026-11-15T17:35:58.384Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -72,7 +72,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.369Z",
+    "createdAt": "2026-11-15T17:35:58.389Z",
     "currency": "DUAL",
     "description": "Learn server components, streaming SSR, modern custom hooks, state management, and high-performance frontend engineering.",
     "is_deleted_by_author": false,
@@ -80,7 +80,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Modern React 19 & Next.js 15 Masterclass",
-    "updatedAt": "2026-11-15T12:44:38.369Z",
+    "updatedAt": "2026-11-15T17:35:58.389Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -100,7 +100,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.460Z",
+    "createdAt": "2026-11-15T17:35:58.394Z",
     "currency": "DUAL",
     "description": "Build neural networks, train transformers, explore computer vision, and deploy cutting-edge AI models to production scalable systems.",
     "is_deleted_by_author": false,
@@ -108,7 +108,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Artificial Intelligence & Deep Learning with PyTorch",
-    "updatedAt": "2026-11-15T12:44:38.460Z",
+    "updatedAt": "2026-11-15T17:35:58.394Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -128,7 +128,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.478Z",
+    "createdAt": "2026-11-15T17:35:58.397Z",
     "currency": "DUAL",
     "description": "Identify reentrancy attacks, integer overflows, access control bugs, and front-running risks using Slither, Echidna, and Foundry.",
     "is_deleted_by_author": false,
@@ -136,7 +136,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Smart Contract Auditing & Security Vulnerabilities",
-    "updatedAt": "2026-11-15T12:44:38.478Z",
+    "updatedAt": "2026-11-15T17:35:58.397Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -156,7 +156,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.502Z",
+    "createdAt": "2026-11-15T17:35:58.401Z",
     "currency": "DUAL",
     "description": "Explore Circom, zk-SNARKs, Groth16, and rollup scaling architectures powering next-generation privacy-preserving blockchains.",
     "is_deleted_by_author": false,
@@ -164,7 +164,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Zero-Knowledge Proofs & zkEVM Cryptography",
-    "updatedAt": "2026-11-15T12:44:38.502Z",
+    "updatedAt": "2026-11-15T17:35:58.401Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -184,7 +184,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.511Z",
+    "createdAt": "2026-11-15T17:35:58.403Z",
     "currency": "DUAL",
     "description": "Write lightning-fast, memory-safe programs in Rust. Build decentralized applications and smart contracts on Solana using Anchor.",
     "is_deleted_by_author": false,
@@ -192,7 +192,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "Rust Programming for Solana & Systems Engineering",
-    "updatedAt": "2026-11-15T12:44:38.511Z",
+    "updatedAt": "2026-11-15T17:35:58.403Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -212,7 +212,7 @@
     "course_video": [
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.522Z",
+    "createdAt": "2026-11-15T17:35:58.406Z",
     "currency": "DUAL",
     "description": "Design decentralized autonomous organizations with Snapshot voting, multi-sig treasuries, tokenomics, and governance execution.",
     "is_deleted_by_author": false,
@@ -220,7 +220,7 @@
     "price_eth": 0,
     "price_inr": 0,
     "title": "DAO Architecture & Governance Protocol Design",
-    "updatedAt": "2026-11-15T12:44:38.522Z",
+    "updatedAt": "2026-11-15T17:35:58.406Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -238,7 +238,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794678049311_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.530Z",
+    "createdAt": "2026-11-15T17:35:58.409Z",
     "currency": "DUAL",
     "description": "Python",
     "is_deleted_by_author": false,
@@ -246,7 +246,7 @@
     "price_eth": 0.0001,
     "price_inr": 200,
     "title": "Python",
-    "updatedAt": "2026-11-15T12:44:38.530Z",
+    "updatedAt": "2026-11-15T17:35:58.409Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -264,7 +264,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794723872339_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.549Z",
+    "createdAt": "2026-11-15T17:35:58.412Z",
     "currency": "DUAL",
     "description": "C++",
     "is_deleted_by_author": true,
@@ -272,7 +272,7 @@
     "price_eth": 0.0001,
     "price_inr": 100,
     "title": "C++",
-    "updatedAt": "2026-11-15T12:44:38.549Z",
+    "updatedAt": "2026-11-15T17:35:58.412Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -290,7 +290,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794686851767_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.557Z",
+    "createdAt": "2026-11-15T17:35:58.414Z",
     "currency": "DUAL",
     "description": "Java",
     "is_deleted_by_author": false,
@@ -298,7 +298,7 @@
     "price_eth": 0.0001,
     "price_inr": 400,
     "title": "Java",
-    "updatedAt": "2026-11-15T12:44:38.557Z",
+    "updatedAt": "2026-11-15T17:35:58.414Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -316,7 +316,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794744855322_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.564Z",
+    "createdAt": "2026-11-15T17:35:58.417Z",
     "currency": "DUAL",
     "description": "SQL",
     "is_deleted_by_author": true,
@@ -324,7 +324,7 @@
     "price_eth": 0.0001,
     "price_inr": 300,
     "title": "SQL",
-    "updatedAt": "2026-11-15T12:44:38.564Z",
+    "updatedAt": "2026-11-15T17:35:58.417Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -342,7 +342,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794728172273_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.574Z",
+    "createdAt": "2026-11-15T17:35:58.419Z",
     "currency": "DUAL",
     "description": "JAVASCRIPT",
     "is_deleted_by_author": false,
@@ -350,7 +350,7 @@
     "price_eth": 0.0001,
     "price_inr": 100,
     "title": "JAVASCRIPT",
-    "updatedAt": "2026-11-15T12:44:38.574Z",
+    "updatedAt": "2026-11-15T17:35:58.419Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -368,7 +368,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794728262628_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.583Z",
+    "createdAt": "2026-11-15T17:35:58.421Z",
     "currency": "DUAL",
     "description": "CSS",
     "is_deleted_by_author": true,
@@ -376,7 +376,7 @@
     "price_eth": 0.0001,
     "price_inr": 75,
     "title": "CSS",
-    "updatedAt": "2026-11-15T12:47:53.278Z",
+    "updatedAt": "2026-11-15T17:35:58.421Z",
     "upi_id": "9969170089@upi"
   },
   {
@@ -394,7 +394,7 @@
     "course_video": [
       "http://localhost:5000/uploads/1794746765940_Edusphere_Python_in_30_Seconds.mp4"
     ],
-    "createdAt": "2026-11-15T12:44:38.590Z",
+    "createdAt": "2026-11-15T17:35:58.422Z",
     "currency": "DUAL",
     "description": "HTML",
     "is_deleted_by_author": true,
@@ -402,7 +402,33 @@
     "price_eth": 0.0001,
     "price_inr": 400,
     "title": "HTML",
-    "updatedAt": "2026-11-15T12:47:50.587Z",
+    "updatedAt": "2026-11-15T17:35:58.422Z",
     "upi_id": "9969170089@upi"
+  },
+  {
+    "_id": "6af9ee37b354308044646065",
+    "title": "hello",
+    "description": "hellop",
+    "author_name": "Prof Pramila Chawan",
+    "author_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
+    "category": [
+      "Coding"
+    ],
+    "course_points": 100,
+    "course_price": 0.0001,
+    "currency": "DUAL",
+    "price_inr": 400,
+    "price_eth": 0.0001,
+    "upi_id": "9969170089@upi",
+    "buy_count": 0,
+    "course_image": "http://localhost:5000/uploads/1794764342363_Python.jpg",
+    "is_delisted": false,
+    "is_deleted_by_author": false,
+    "course_video": [
+      "http://localhost:5000/uploads/1794764342991_2.mp4"
+    ],
+    "createdAt": "2026-11-15T17:39:03.178Z",
+    "updatedAt": "2026-11-15T17:39:03.178Z",
+    "__v": 0
   }
 ]

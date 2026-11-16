@@ -3,7 +3,7 @@
     "_id": "6af85711fed68cb44aa2f4a1",
     "__v": 9,
     "badge": "Beginner",
-    "coins": 950,
+    "coins": 800,
     "courses_completed": [],
     "courses_enrolled": [
       "6af95095599083b58342eda7",
@@ -12,12 +12,12 @@
       "6af9a1bc891ef4a4a792e93b",
       "6af86744730cb9221f3c0f69"
     ],
-    "createdAt": "2026-11-15T12:44:38.615Z",
+    "createdAt": "2026-11-15T17:35:58.429Z",
     "demo_upi_balance": 387,
     "inr_balance": 387,
     "locked_account_name": "Hitanshu",
     "metamask_wallet_id": "0x1713a5e9c9cb805c97a8b25a71bd7a337d0466e3",
-    "updatedAt": "2026-11-15T12:49:26.218Z",
+    "updatedAt": "2026-11-15T17:49:24.553Z",
     "user_name": "Hitanshu"
   },
   {
@@ -30,12 +30,12 @@
       "6af86744730cb9221f3c0f6c",
       "6af86744730cb9221f3c0f6a"
     ],
-    "createdAt": "2026-11-15T12:44:38.629Z",
+    "createdAt": "2026-11-15T17:35:58.432Z",
     "demo_upi_balance": 4588,
     "inr_balance": 4588,
     "locked_account_name": "Prof Pramila Chawan",
     "metamask_wallet_id": "0x8410018e96ab3e9fcfde497e11da5620d2ab5408",
-    "updatedAt": "2026-11-15T12:44:38.629Z",
+    "updatedAt": "2026-11-15T17:35:58.432Z",
     "user_name": "Prof Pramila Chawan"
   }
 ]

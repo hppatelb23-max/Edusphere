@@ -20,7 +20,11 @@ import {
   FiImage,
   FiUpload,
   FiX,
-  FiZoomIn
+  FiZoomIn,
+  FiZap,
+  FiUploadCloud,
+  FiFileText,
+  FiDownload
 } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { useWallet } from "../../context/WalletProvider";
@@ -29,6 +33,8 @@ import ThreeLineMenu from "../ThreeLineMenu";
 import { useTheme } from "next-themes";
 import { createNewTest } from "../../utils/testsApi";
 import ImageZoomModal from "./ImageZoomModal";
+import ImportDatasetModal from "./ImportDatasetModal";
+import AIGeneratorModal from "./AIGeneratorModal";
 
 const CreateTest = () => {
   const navigate = useNavigate();
@@ -65,6 +71,8 @@ const CreateTest = () => {
   const [authorName, setAuthorName] = useState("Educator");
   const [isPublishing, setIsPublishing] = useState(false);
   const [zoomImage, setZoomImage] = useState(null); // { src, alt }
+  const [showDatasetModal, setShowDatasetModal] = useState(false);
+  const [showAiModal, setShowAiModal] = useState(false);
 
   // Question bank state (default with 2 initial question templates)
   const [questions, setQuestions] = useState([
@@ -300,6 +308,24 @@ const CreateTest = () => {
     ]);
     setPickRandomCount((prev) => prev + 1);
     toast.success("Sample question added to bank!");
+  };
+
+  // Automated test population handler for Dataset Import (Option A) and AI Generator (Option B)
+  const handleImportQuestions = (importedQuestions, mode = "append") => {
+    if (!importedQuestions || !Array.isArray(importedQuestions) || importedQuestions.length === 0) return;
+
+    if (mode === "replace") {
+      setQuestions(importedQuestions);
+      setPickRandomCount(importedQuestions.length);
+      toast.success(`Loaded ${importedQuestions.length} questions into test bank!`);
+    } else {
+      setQuestions((prev) => {
+        const combined = [...prev, ...importedQuestions];
+        setPickRandomCount(combined.length);
+        return combined;
+      });
+      toast.success(`Appended ${importedQuestions.length} questions to test bank!`);
+    }
   };
 
   // Submit and Publish test
@@ -854,13 +880,31 @@ const CreateTest = () => {
                 <h3 className="text-2xl font-black">Type Questions & Solutions</h3>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowDatasetModal(true)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold border border-amber-400/50 text-amber-300 hover:bg-amber-400 hover:text-black transition-all flex items-center gap-1.5 shadow-sm"
+                  title="Import questions from CSV, TSV or JSON dataset"
+                >
+                  <FiUploadCloud className="w-3.5 h-3.5" />
+                  <span>📁 Import Dataset</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAiModal(true)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-400/20 border border-amber-400/60 text-amber-300 hover:bg-amber-400 hover:text-black transition-all flex items-center gap-1.5 shadow-sm"
+                  title="Generate MCQs automatically from lecture notes or syllabus"
+                >
+                  <FiZap className="w-3.5 h-3.5" />
+                  <span>⚡ AI from Notes</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleAddSampleQuestion}
-                  className="px-4 py-2 rounded-xl text-xs font-bold border border-amber-400/40 text-amber-400 hover:bg-amber-400/10 transition-colors"
+                  className="px-3 py-2 rounded-xl text-xs font-bold border border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
                 >
-                  + Add Sample Question
+                  + Sample
                 </button>
                 <button
                   type="button"
@@ -869,6 +913,40 @@ const CreateTest = () => {
                 >
                   <FiPlus className="w-4 h-4" />
                   <span>Add Question</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Automation Options Banner */}
+            <div className="mb-6 p-4 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-transparent flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-amber-400 text-black shadow-md shadow-amber-400/20">
+                  <FiZap className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-300">Automate Test Creation</h4>
+                  <p className="text-xs text-gray-400">
+                    Bulk-import an existing CSV / JSON dataset or let AI extract 4-option MCQs from your lecture notes in seconds.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDatasetModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-400/15 border border-amber-400/50 text-amber-300 hover:bg-amber-400 hover:text-black transition-all flex items-center gap-1.5"
+                >
+                  <FiUploadCloud className="w-3.5 h-3.5" />
+                  <span>Option A: Import Dataset</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAiModal(true)}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-400 text-black hover:from-amber-400 hover:to-amber-300 transition-all flex items-center gap-1.5 shadow-md shadow-amber-500/20"
+                >
+                  <FiZap className="w-3.5 h-3.5" />
+                  <span>Option B: AI Generate</span>
                 </button>
               </div>
             </div>
@@ -1177,6 +1255,23 @@ const CreateTest = () => {
         src={zoomImage?.src}
         alt={zoomImage?.alt}
         onClose={() => setZoomImage(null)}
+      />
+
+      {/* Option A: Structured Dataset Import Modal (CSV, TSV, JSON) */}
+      <ImportDatasetModal
+        isOpen={showDatasetModal}
+        onClose={() => setShowDatasetModal(false)}
+        onImportQuestions={handleImportQuestions}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Option B: AI Question Generator Modal (From Notes / Text) */}
+      <AIGeneratorModal
+        isOpen={showAiModal}
+        onClose={() => setShowAiModal(false)}
+        onAddQuestions={handleImportQuestions}
+        isDarkMode={isDarkMode}
+        initialTopic={title || category}
       />
     </div>
   );

@@ -1,6 +1,10 @@
 const Users = require("../models/user_schema");
 const Tests = require("../models/test_schema");
 const { persistModel } = require("../utils/persistence");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const { execFile } = require("child_process");
 
 const defaultSampleTests = [
     {
@@ -890,6 +894,285 @@ async function ClearAllSubmissions(req, res) {
     }
 }
 
+// POST /tests/extract-document (Extract text from PDF, Word .docx/.doc, or text files)
+async function ExtractDocumentText(req, res) {
+    try {
+        const { fileData, fileName } = req.body;
+        if (!fileData || !fileName) {
+            return res.status(400).json({ error: "Missing fileData or fileName." });
+        }
+
+        const ext = path.extname(fileName).toLowerCase();
+        if (![".pdf", ".docx", ".doc", ".txt", ".md", ".text"].includes(ext)) {
+            return res.status(400).json({ error: "Unsupported file type. Please upload a .pdf, .docx, .doc, or .txt file." });
+        }
+
+        const cleanBase64 = fileData.replace(/^data:[^;]+;base64,/, "");
+        const buffer = Buffer.from(cleanBase64, "base64");
+
+        const tempDir = os.tmpdir();
+        const safeBase = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
+        const tempFilePath = path.join(tempDir, `edusphere_${Date.now()}_${safeBase}`);
+        fs.writeFileSync(tempFilePath, buffer);
+
+        const pythonScript = path.join(__dirname, "../utils/extract_document.py");
+
+        execFile("python", [pythonScript, tempFilePath], { maxBuffer: 15 * 1024 * 1024 }, (err, stdout, stderr) => {
+            try { if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath); } catch (e) {}
+
+            if (err) {
+                console.error("Document extraction error:", err, stderr);
+                return res.status(500).json({ error: "Failed to extract text from document: " + (stderr || err.message) });
+            }
+
+            try {
+                const parsed = JSON.parse(stdout);
+                if (parsed.error) {
+                    return res.status(400).json({ error: parsed.error });
+                }
+                const wordCount = (parsed.text || "").trim().split(/\s+/).filter(Boolean).length;
+                return res.status(200).json({
+                    success: true,
+                    text: parsed.text,
+                    fileName: fileName,
+                    pages: parsed.pages || 1,
+                    wordCount: wordCount
+                });
+            } catch (jsonErr) {
+                return res.status(500).json({ error: "Failed to parse document extraction output." });
+            }
+        });
+    } catch (err) {
+        console.error("ExtractDocumentText error:", err);
+        return res.status(500).json({ error: "Internal server error: " + err.message });
+    }
+}
+
+// POST /tests/generate-from-notes (Intelligent Question Generator from Educator Notes / Text / Documents)
+async function GenerateQuestionsFromNotes(req, res) {
+    try {
+        const { notes, topic = "", difficulty = "Intermediate", count = 5, apiKey = "" } = req.body;
+        if (!notes || typeof notes !== "string" || notes.trim().length < 20) {
+            return res.status(400).json({ error: "Document or notes text must contain at least 20 characters." });
+        }
+
+        const activeGeminiKey = apiKey || process.env.GEMINI_API_KEY;
+
+        // --- 1. If Gemini API Key is available, call Google Gemini for authentic academic exam creation ---
+        if (activeGeminiKey) {
+            try {
+                const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${activeGeminiKey}`;
+                const prompt = `You are a university professor and pedagogical assessment expert.
+Create exactly ${count} professional, challenging, high-quality multiple choice questions (MCQs) of ${difficulty} difficulty based STRICTLY on the educational content of the following text.
+DO NOT include author names, affiliations, email addresses, volume numbers, citations, or paper metadata. Focus purely on technical definitions, mechanisms, concepts, findings, and methodologies.
+
+Text Material:
+"""
+${notes.slice(0, 15000)}
+"""
+
+Format your response as a valid JSON array of objects with the exact schema:
+[
+  {
+    "question": "A specific, clearly worded question directly testing the subject matter",
+    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+    "correct_option": 0,
+    "explanation": "Clear explanation citing the concept from the text"
+  }
+]
+Return ONLY the raw JSON array without markdown formatting.`;
+
+                const geminiRes = await fetch(geminiUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            temperature: 0.2,
+                            responseMimeType: "application/json"
+                        }
+                    })
+                });
+
+                if (geminiRes.ok) {
+                    const geminiData = await geminiRes.json();
+                    const rawJson = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (rawJson) {
+                        const parsed = JSON.parse(rawJson);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            return res.status(200).json({
+                                success: true,
+                                engine: "gemini-1.5-flash",
+                                topic: topic || "Course Material",
+                                difficulty,
+                                count: parsed.length,
+                                questions: parsed
+                            });
+                        }
+                    }
+                }
+            } catch (geminiErr) {
+                console.warn("Gemini API call failed, falling back to advanced semantic analyzer:", geminiErr.message);
+            }
+        }
+
+        // --- 2. Advanced Content-Aware Semantic Analysis (Metadata Purging + Concept Extraction) ---
+        const cleaned = notes.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        const lines = cleaned.split("\n").map(l => l.trim()).filter(Boolean);
+
+        // Filter out academic metadata: authors, affiliations, footnotes, emails, publication stats
+        const isMetadataLine = (line) => {
+            const lower = line.toLowerCase();
+            return (
+                lower.includes("@") ||
+                lower.includes("http") ||
+                lower.includes("doi.org") ||
+                lower.includes("arxiv:") ||
+                lower.includes("university") ||
+                lower.includes("institute") ||
+                lower.includes("laboratory") ||
+                lower.includes("department") ||
+                lower.includes("zurich") ||
+                lower.includes("ibm research") ||
+                lower.includes("all rights reserved") ||
+                lower.includes("received:") ||
+                lower.includes("accepted:") ||
+                lower.includes("published:") ||
+                lower.includes("keywords:") ||
+                lower.includes("et al.") ||
+                /^[0-9*,\s]+$/.test(line) ||
+                // Author patterns like "Name 1,2*, OtherName 2 and ThirdName 1"
+                /([A-Z][a-z]+ [A-Z][a-z]+\s*[0-9*,\s]+)/.test(line) && line.length < 90 ||
+                // Fragment ending with conjunctions
+                /^(and|or|for|with|of|in|to)\b/i.test(line) && line.split(/\s+/).length < 5
+            );
+        };
+
+        const bodyLines = lines.filter(l => !isMetadataLine(l));
+        const bodyText = bodyLines.join(" ");
+
+        // Auto-detect topic if not set
+        let detectedTopic = topic;
+        if (!detectedTopic || detectedTopic.toLowerCase() === "web3" || detectedTopic.toLowerCase() === "general") {
+            const titleCandidate = bodyLines.slice(0, 3).find(l => l.length >= 15 && l.length <= 120 && !l.endsWith("."));
+            if (titleCandidate) {
+                detectedTopic = titleCandidate;
+            } else {
+                detectedTopic = "Subject Concept Assessment";
+            }
+        }
+
+        // Split into real grammatical sentences (must have >= 8 words, end with punctuation)
+        const sentences = bodyText
+            .split(/(?<=[.?!])\s+(?=[A-Z0-9])/)
+            .map(s => s.trim().replace(/^[\*\-\d\.\s]+/, ""))
+            .filter(s => {
+                const words = s.split(/\s+/);
+                if (words.length < 8 || words.length > 50) return false;
+                // Exclude sentences that contain author superscript patterns or institutional terms
+                if (/1,2\*|[0-9]\*|ibm|zurich|switzerland|university|department/i.test(s)) return false;
+                // Must contain an active verb
+                const lower = s.toLowerCase();
+                return (
+                    lower.includes(" is ") ||
+                    lower.includes(" are ") ||
+                    lower.includes(" means ") ||
+                    lower.includes(" allows ") ||
+                    lower.includes(" enables ") ||
+                    lower.includes(" uses ") ||
+                    lower.includes(" consists of ") ||
+                    lower.includes(" demonstrates ") ||
+                    lower.includes(" provides ") ||
+                    lower.includes(" shows ") ||
+                    lower.includes(" represents ")
+                );
+            });
+
+        const targetCount = Math.min(Math.max(Number(count) || 5, 1), 15);
+        const selected = sentences.slice(0, targetCount);
+
+        if (selected.length === 0) {
+            return res.status(400).json({
+                error: "Could not extract clear technical statements from the text. Please ensure the document contains substantive paragraphs."
+            });
+        }
+
+        // Extract key terms to construct realistic, content-specific distractors from the same document
+        const conceptTerms = [];
+        bodyLines.forEach(l => {
+            const matches = l.match(/\b([A-Z][a-z]+ [A-Z][a-z]+|[a-z]+ [a-z]+ distribution|[a-z]+ circuit|[a-z]+ algorithm|[a-z]+ generator|[a-z]+ network)\b/g);
+            if (matches) {
+                matches.forEach(m => {
+                    if (m.length > 8 && !conceptTerms.includes(m) && !isMetadataLine(m)) {
+                        conceptTerms.push(m);
+                    }
+                });
+            }
+        });
+
+        const questions = selected.map((stmt, idx) => {
+            let qText = "";
+            let correctAns = "";
+            let explanation = `Source material demonstrates: "${stmt}".`;
+
+            const match = stmt.match(/^(.*?)\s+(is defined as|is used for|is used to|refers to|allows|enables|uses|consists of|demonstrates|provides|is|are)\s+(.*)$/i);
+            if (match && match[1].length >= 4 && match[3].length >= 10) {
+                const subject = match[1].trim();
+                const verb = match[2].trim().toLowerCase();
+                const predicate = match[3].trim().replace(/\.$/, "");
+
+                qText = `According to the reference text, what is the core role or characteristic of "${subject}"?`;
+                correctAns = (verb.startsWith("is") ? "" : verb.charAt(0).toUpperCase() + verb.slice(1) + " ") + predicate;
+                explanation = `As stated in the reference notes: "${subject}" ${verb} ${predicate}.`;
+            } else {
+                qText = `Which of the following statements regarding "${detectedTopic}" is factually accurate based on the material?`;
+                correctAns = stmt;
+            }
+
+            // Synthesize 3 realistic distractors from context
+            const distractors = [];
+            const termA = conceptTerms[idx % conceptTerms.length] || "secondary feature mapping";
+            const termB = conceptTerms[(idx + 1) % conceptTerms.length] || "parameterized optimization";
+            const termC = conceptTerms[(idx + 2) % conceptTerms.length] || "classical state evaluation";
+
+            distractors.push(`It relies exclusively on ${termA} to bypass convergence latency.`);
+            distractors.push(`It replaces iterative training with fixed ${termB} transformations.`);
+            distractors.push(`It requires manual intervention to adjust ${termC} parameters.`);
+
+            const correctIdx = (idx * 2 + 1) % 4;
+            const options = [];
+            let dCount = 0;
+            for (let i = 0; i < 4; i++) {
+                if (i === correctIdx) {
+                    options.push(correctAns);
+                } else {
+                    options.push(distractors[dCount++] || `Alternative mechanism ${i + 1}`);
+                }
+            }
+
+            return {
+                question: qText,
+                question_image: "",
+                options: options,
+                option_images: ["", "", "", ""],
+                correct_option: correctIdx,
+                explanation: explanation
+            };
+        });
+
+        return res.status(200).json({
+            success: true,
+            topic: detectedTopic,
+            difficulty,
+            count: questions.length,
+            questions
+        });
+    } catch (err) {
+        console.error("GenerateQuestionsFromNotes error:", err);
+        return res.status(500).json({ error: "Failed to generate questions: " + err.message });
+    }
+}
+
 module.exports = {
     DisplayTests,
     GetTestById,
@@ -901,6 +1184,8 @@ module.exports = {
     DeleteSubmission,
     DeleteSubmissionRecording,
     ClearAllSubmissions,
+    ExtractDocumentText,
+    GenerateQuestionsFromNotes,
     defaultSampleTests
 };
 
