@@ -678,11 +678,11 @@ const TransactionPage = () => {
     <div
       className={`${isDarkMode
         ? "bg-gradient-to-r from-black to-gray-900 text-gold"
-        : "bg-gradient-to-r from-gray-50 to-white text-black"
+        : "bg-gradient-to-br from-slate-50 via-white to-amber-50/20 text-slate-900"
         } transition-colors duration-300 min-h-[100vh] flex flex-col`}
     >
       {/* Navbar */}
-      <nav className="flex justify-between items-center p-6 border-b border-amber-500/20 shadow-sm">
+      <nav className={`flex justify-between items-center p-6 border-b ${isDarkMode ? "border-amber-500/20 bg-gray-900/60" : "border-slate-200/80 bg-white/85 backdrop-blur-md"} shadow-sm sticky top-0 z-40`}>
         <div className="flex items-center space-x-2">
           <img src="/images/Edusphere logo.png" alt="Logo" className="w-12 h-12 rounded-full shadow-lg" />
           <h1 className="text-3xl sm:text-4xl font-extrabold bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">
@@ -797,13 +797,13 @@ const TransactionPage = () => {
           </div>
         ) : (
           <div className={`rounded-3xl overflow-hidden border shadow-xl ${
-            isDarkMode ? "bg-gray-900/80 border-gray-800" : "bg-white border-gray-200"
+            isDarkMode ? "bg-gray-900/80 border-gray-800" : "bg-white/95 border-slate-200/90 shadow-xl shadow-slate-100"
           }`}>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className={`text-xs uppercase tracking-wider font-extrabold border-b ${
-                    isDarkMode ? "bg-black/60 text-amber-300 border-gray-800" : "bg-amber-50/70 text-amber-900 border-amber-200"
+                    isDarkMode ? "bg-black/60 text-amber-300 border-gray-800" : "bg-slate-50/90 text-slate-700 border-slate-200"
                   }`}>
                     <th className="p-4 sm:p-5">Transaction Type</th>
                     <th className="p-4 sm:p-5">
@@ -819,12 +819,12 @@ const TransactionPage = () => {
                     <th className="p-4 sm:p-5 text-center">Official Receipt</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/50 text-sm">
+                <tbody className={`divide-y text-sm ${isDarkMode ? "divide-gray-800/50" : "divide-slate-200/70"}`}>
                   {finalRecords.map((txn, index) => (
                     <tr
                       key={txn._id || index}
                       className={`transition-colors ${
-                        isDarkMode ? "hover:bg-amber-500/5" : "hover:bg-amber-50/50"
+                        isDarkMode ? "hover:bg-amber-500/5" : "hover:bg-amber-50/40"
                       }`}
                     >
                       {/* Transaction Type */}
@@ -834,20 +834,26 @@ const TransactionPage = () => {
                             💰 Student Course Sale
                           </span>
                         ) : txn.type === "deposit" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                            isDarkMode ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30" : "bg-cyan-50 text-cyan-700 border border-cyan-200"
+                          }`}>
                             💳 Wallet Top-Up
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap ${
+                            isDarkMode ? "bg-amber-500/20 text-amber-400 border border-amber-500/30" : "bg-amber-100/70 text-amber-800 border border-amber-300/50"
+                          }`}>
                             📚 Course Purchase
                           </span>
                         )}
                       </td>
 
                       {/* Party / Purchaser Name */}
-                      <td className="p-4 sm:p-5 font-bold text-amber-400">
+                      <td className={`p-4 sm:p-5 font-bold ${isDarkMode ? "text-amber-400" : "text-amber-700"}`}>
                         <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 font-black text-xs flex items-center justify-center shrink-0">
+                          <div className={`w-7 h-7 rounded-full font-black text-xs flex items-center justify-center shrink-0 ${
+                            isDarkMode ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-800 border border-amber-200"
+                          }`}>
                             {txn.student_name ? txn.student_name[0].toUpperCase() : "U"}
                           </div>
                           <span className="truncate max-w-[150px]">{txn.student_name}</span>
@@ -855,40 +861,50 @@ const TransactionPage = () => {
                       </td>
 
                       {/* Course / Description */}
-                      <td className="p-4 sm:p-5 font-semibold text-white max-w-xs truncate">
+                      <td className={`p-4 sm:p-5 font-semibold max-w-xs truncate ${
+                        isDarkMode ? "text-white" : "text-slate-900"
+                      }`}>
                         {txn.course_purchased}
                       </td>
 
                       {/* Educator / Beneficiary */}
-                      <td className="p-4 sm:p-5 text-gray-300 text-xs">
+                      <td className={`p-4 sm:p-5 text-xs font-medium ${
+                        isDarkMode ? "text-gray-300" : "text-slate-600"
+                      }`}>
                         {txn.educator_name}
                       </td>
 
                       {/* Amount */}
                       <td className="p-4 sm:p-5 font-extrabold font-mono">
                         {txn.is_credit ? (
-                          <span className="text-emerald-400">
+                          <span className={isDarkMode ? "text-emerald-400" : "text-emerald-600 font-black"}>
                             +{txn.currency === "INR" ? `₹${Number(txn.amount).toLocaleString("en-IN")}` : `${txn.amount} ETH`}
                           </span>
                         ) : (
-                          <span className="text-white">
+                          <span className={isDarkMode ? "text-white" : "text-slate-900 font-black"}>
                             {txn.currency === "INR" ? `₹${Number(txn.amount).toLocaleString("en-IN")}` : `${txn.amount} ETH`}
                           </span>
                         )}
                       </td>
 
                       {/* Payment Method */}
-                      <td className="p-4 sm:p-5 text-xs text-gray-300">
-                        <span className="inline-block px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700 font-medium whitespace-nowrap">
+                      <td className="p-4 sm:p-5 text-xs">
+                        <span className={`inline-block px-2.5 py-1 rounded-full border font-medium whitespace-nowrap ${
+                          isDarkMode ? "bg-gray-800 text-gray-300 border-gray-700" : "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}>
                           {txn.payment_method}
                         </span>
                       </td>
 
                       {/* Date & Time */}
-                      <td className="p-4 sm:p-5 text-xs text-gray-300 whitespace-nowrap">
-                        <div className="font-bold text-white text-xs">{txn.purchase_date}</div>
+                      <td className={`p-4 sm:p-5 text-xs whitespace-nowrap ${
+                        isDarkMode ? "text-gray-300" : "text-slate-600"
+                      }`}>
+                        <div className={`font-bold text-xs ${isDarkMode ? "text-white" : "text-slate-900"}`}>{txn.purchase_date}</div>
                         {txn.purchase_time && (
-                          <div className="text-[11px] text-amber-400 font-mono mt-0.5">{txn.purchase_time}</div>
+                          <div className={`text-[11px] font-mono mt-0.5 ${
+                            isDarkMode ? "text-amber-400" : "text-amber-600 font-semibold"
+                          }`}>{txn.purchase_time}</div>
                         )}
                       </td>
 

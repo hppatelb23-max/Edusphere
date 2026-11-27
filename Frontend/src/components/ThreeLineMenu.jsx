@@ -488,7 +488,7 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               className={`absolute right-0 mt-2 w-64 origin-top-right rounded-2xl shadow-2xl backdrop-blur-lg ${
-                isDarkMode ? "bg-gray-900/95 border border-gray-700 text-white" : "bg-white/95 border border-amber-100 text-gray-800"
+                isDarkMode ? "bg-gray-900/95 border border-gray-700 text-white" : "bg-white/98 border border-slate-200 text-slate-800 shadow-2xl shadow-slate-300/60 ring-1 ring-slate-900/5"
               } z-50 overflow-hidden`}
             >
               <div className="p-2 space-y-1 text-sm font-medium">
@@ -501,7 +501,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                         if (onAddMoneyClick) onAddMoneyClick();
                         else setShowAddMoneyModal(true);
                       }}
-                      className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-emerald-500/15 text-emerald-400 font-bold transition-all text-left group cursor-pointer"
+                      className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all text-left group cursor-pointer ${
+                        isDarkMode ? "hover:bg-emerald-500/15 text-emerald-400" : "hover:bg-emerald-50 text-emerald-600"
+                      } font-bold`}
                     >
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition-colors">
                         <FiPlusCircle className="text-base" />
@@ -509,16 +511,20 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <span className="block leading-none">Add Money</span>
-                          <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+                          <span className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            isDarkMode ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-700 bg-emerald-100"
+                          }`}>₹{Number(inrBalance).toLocaleString("en-IN")}</span>
                         </div>
-                        <span className="text-[10px] text-gray-400 font-normal">UPI & Card (Max ₹2000)</span>
+                        <span className={`text-[10px] font-normal ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>UPI & Card (Max ₹2000)</span>
                       </div>
                     </button>
 
                     <Link
                       to="/courses"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-amber-400 font-semibold transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors font-semibold ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-amber-400" : "hover:bg-amber-50/80 text-amber-600"
+                      }`}
                     >
                       <FiBook className="text-amber-500" />
                       <span>Other Courses</span>
@@ -527,7 +533,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/managecourses"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiBook className="text-amber-500" />
                       <span>Manage Courses</span>
@@ -536,7 +544,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/createcourses"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiPlus className="text-amber-500" />
                       <span>Create Courses</span>
@@ -545,7 +555,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/create-test"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-amber-500 font-semibold transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors font-semibold ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-amber-400" : "hover:bg-amber-50/80 text-amber-600"
+                      }`}
                     >
                       <FiBookOpen className="text-amber-500" />
                       <span>Create Test</span>
@@ -554,16 +566,20 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/educator-marks"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-emerald-500/10 text-emerald-400 font-semibold transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors font-semibold ${
+                        isDarkMode ? "hover:bg-emerald-500/10 text-emerald-400" : "hover:bg-emerald-50 text-emerald-600"
+                      }`}
                     >
-                      <FiAward className="text-emerald-400" />
+                      <FiAward className="text-emerald-500" />
                       <span>Student Marks</span>
                     </Link>
 
                     <Link
                       to="/tests"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiBookOpen className="text-amber-500" />
                       <span>Test Facility</span>
@@ -576,7 +592,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                         localStorage.setItem("role", "educator");
                         setDropdownOpen(false);
                       }}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiDollarSign className="text-amber-500" />
                       <span>Transactions</span>
@@ -585,7 +603,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/mylearning"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiBook className="text-amber-500" />
                       <span>My Learning</span>
@@ -601,7 +621,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                         if (onAddMoneyClick) onAddMoneyClick();
                         else setShowAddMoneyModal(true);
                       }}
-                      className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-emerald-500/15 text-emerald-400 font-bold transition-all text-left group cursor-pointer"
+                      className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-all text-left group cursor-pointer ${
+                        isDarkMode ? "hover:bg-emerald-500/15 text-emerald-400" : "hover:bg-emerald-50 text-emerald-600"
+                      } font-bold`}
                     >
                       <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 border border-emerald-500/30 group-hover:bg-emerald-500 group-hover:text-black transition-colors">
                         <FiPlusCircle className="text-base" />
@@ -609,9 +631,11 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                       <div className="flex-1">
                         <div className="flex items-center justify-between">
                           <span className="block leading-none">Add Money</span>
-                          <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+                          <span className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            isDarkMode ? "text-emerald-400 bg-emerald-500/10" : "text-emerald-700 bg-emerald-100"
+                          }`}>₹{Number(inrBalance).toLocaleString("en-IN")}</span>
                         </div>
-                        <span className="text-[10px] text-gray-400 font-normal">UPI & Card (Max ₹500)</span>
+                        <span className={`text-[10px] font-normal ${isDarkMode ? "text-gray-400" : "text-slate-500"}`}>UPI & Card (Max ₹500)</span>
                       </div>
                     </button>
 
@@ -619,9 +643,11 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/my-test-marks"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-emerald-500/10 text-emerald-400 font-semibold transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors font-semibold ${
+                        isDarkMode ? "hover:bg-emerald-500/10 text-emerald-400" : "hover:bg-emerald-50 text-emerald-600"
+                      }`}
                     >
-                      <FiAward className="text-emerald-400" />
+                      <FiAward className="text-emerald-500" />
                       <span>My Test Review</span>
                     </Link>
 
@@ -629,7 +655,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/mylearning"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiBook className="text-amber-500" />
                       <span>My Learning</span>
@@ -643,7 +671,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                         localStorage.setItem("role", "student");
                         setDropdownOpen(false);
                       }}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiDollarSign className="text-amber-500" />
                       <span>Transaction</span>
@@ -653,7 +683,9 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                     <Link
                       to="/redeem"
                       onClick={() => setDropdownOpen(false)}
-                      className="flex items-center space-x-3 p-3 rounded-xl hover:bg-amber-500/10 text-gray-200 transition-colors"
+                      className={`flex items-center space-x-3 p-3 rounded-xl transition-colors ${
+                        isDarkMode ? "hover:bg-amber-500/10 text-gray-200 hover:text-amber-300" : "hover:bg-slate-100 text-slate-700 hover:text-amber-600 font-semibold"
+                      }`}
                     >
                       <FiGift className="text-amber-500" />
                       <span>Redeem</span>
@@ -664,9 +696,11 @@ const ThreeLineMenu = ({ onAddMoneyClick, isEducator: propIsEducator }) => {
                 {/* Disconnect Wallet */}
                 <button
                   onClick={handleDisconnect}
-                  className="w-full flex items-center space-x-3 p-3 rounded-xl hover:bg-red-500/10 text-red-400 hover:text-red-300 transition-colors text-left font-medium border-t border-gray-700/50 mt-1 cursor-pointer"
+                  className={`w-full flex items-center space-x-3 p-3 rounded-xl transition-colors text-left font-medium border-t mt-1 cursor-pointer ${
+                    isDarkMode ? "hover:bg-red-500/10 text-red-400 hover:text-red-300 border-gray-700/50" : "hover:bg-red-50 text-red-500 hover:text-red-600 border-slate-200"
+                  }`}
                 >
-                  <FiLogOut className="text-red-400" />
+                  <FiLogOut className="text-red-500" />
                   <span>Disconnect Wallet</span>
                 </button>
               </div>

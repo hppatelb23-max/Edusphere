@@ -292,11 +292,11 @@ const Edusphere = () => {
     <div
       className={`${isDarkMode
           ? "bg-gradient-to-r from-black to-gray-700 text-gold"
-          : "bg-gradient-to-br from-amber-50 via-white to-yellow-50 text-gray-900"
+          : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
         } transition-colors duration-300`}
     >
       {/* Navbar Section */}
-      <nav className={`flex justify-between items-center py-4 px-6 sm:px-8 gap-4 ${isDarkMode ? "bg-gray-900/90 border-b border-gray-700/50" : "bg-white/95 backdrop-blur-sm border-b border-amber-200/70 shadow-sm"} sticky top-0 z-40`}>
+      <nav className={`flex justify-between items-center py-4 px-6 sm:px-8 gap-4 ${isDarkMode ? "bg-gray-900/90 border-b border-gray-700/50" : "bg-white/85 backdrop-blur-md border-b border-slate-200/80 shadow-sm"} sticky top-0 z-40`}>
         <div className="flex items-center space-x-3 shrink-0 mr-4">
           <img
             src="/images/Edusphere logo.png"
@@ -309,35 +309,45 @@ const Edusphere = () => {
         <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
           <Link
             to="/educatorhome"
-            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+            className={`group relative text-base font-semibold transition-colors ${
+              isDarkMode ? "hover:text-amber-500 text-gray-200" : "text-slate-700 hover:text-amber-600"
+            }`}
           >
             Home
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
           </Link>
           <Link
             to="/createcourses"
-            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+            className={`group relative text-base font-semibold transition-colors ${
+              isDarkMode ? "hover:text-amber-500 text-gray-200" : "text-slate-700 hover:text-amber-600"
+            }`}
           >
             Create Courses
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
           </Link>
           <Link
             to="/create-test"
-            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+            className={`group relative text-base font-semibold transition-colors ${
+              isDarkMode ? "hover:text-amber-500 text-gray-200" : "text-slate-700 hover:text-amber-600"
+            }`}
           >
             Create Test
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
           </Link>
           <Link
             to="/educator-marks"
-            className="group relative text-base font-semibold hover:text-emerald-400 transition-colors"
+            className={`group relative text-base font-semibold transition-colors ${
+              isDarkMode ? "hover:text-emerald-400 text-gray-200" : "text-slate-700 hover:text-emerald-600"
+            }`}
           >
             Student Marks
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-400 group-hover:w-full transition-all duration-300"></span>
           </Link>
           <Link
             to="/tests"
-            className="group relative text-base font-semibold hover:text-amber-500 transition-colors"
+            className={`group relative text-base font-semibold transition-colors ${
+              isDarkMode ? "hover:text-amber-500 text-gray-200" : "text-slate-700 hover:text-amber-600"
+            }`}
           >
             Test Facility
             <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
@@ -345,11 +355,15 @@ const Edusphere = () => {
         </div>
 
         <div className="flex items-center space-x-3 sm:space-x-4 shrink-0">
-          {/* Educator Online Money Badge ONLY (No + Add Money button here per user instruction) */}
+          {/* Educator Online Money Badge */}
           {walletConnected && (
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Online Money Available:</span>
-              <span className="font-black text-sm text-emerald-300 font-mono">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+            <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-bold shadow-sm ${
+              isDarkMode
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                : "bg-emerald-50 border-emerald-300 text-emerald-800"
+            }`}>
+              <span className={`font-mono text-[10px] uppercase tracking-wider ${isDarkMode ? "text-emerald-300/80" : "text-emerald-700"}`}>Online Money Available:</span>
+              <span className={`font-black text-sm font-mono ${isDarkMode ? "text-emerald-300" : "text-emerald-800"}`}>₹{Number(inrBalance).toLocaleString("en-IN")}</span>
             </div>
           )}
 
@@ -393,7 +407,7 @@ const Edusphere = () => {
           <ThreeLineMenu isEducator={true} />
         </div>
       </nav>
-      <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-amber-200/60"}></div>
+      <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-slate-200/80"}></div>
 
       {/* Main Content Section */}
       <div className="container mx-auto py-14 px-6 relative">
@@ -407,10 +421,12 @@ const Edusphere = () => {
             />
           </div>
           <div className="lg:w-1/2 space-y-8 animate-fade-in-up delay-100">
-            <h2 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent leading-tight">
+            <h2 className={`text-5xl md:text-6xl font-extrabold leading-tight ${
+              isDarkMode ? "bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent" : "bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 bg-clip-text text-transparent"
+            }`}>
               Revolutionizing Education with Blockchain
             </h2>
-            <p className="text-xl text-gray-600 dark:text-amber-100/80 leading-relaxed">
+            <p className={`text-xl leading-relaxed ${isDarkMode ? "text-amber-100/80" : "text-slate-600 font-normal"}`}>
               Empower your learning journey with decentralized education. Take
               control of your academic credentials, earn rewards for your
               achievements, and access a world of knowledge powered by Web3
@@ -419,17 +435,17 @@ const Edusphere = () => {
             <div className="flex flex-wrap gap-4">
               <Link
                 to="/createcourses"
-                className="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-white px-8 py-4 rounded-full text-lg font-semibold shadow-lg hover:shadow-amber-500/30 transition-all duration-300"
+                className={`${isDarkMode ? "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-white shadow-amber-500/30" : "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-slate-950 shadow-amber-500/25"} px-8 py-4 rounded-full text-lg font-bold shadow-lg transition-all duration-300`}
               >
                 Create Courses
               </Link>
               <Link
                 to="/create-test"
-                className="bg-amber-500/20 border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black px-8 py-4 rounded-full text-lg font-semibold shadow-lg transition-all duration-300"
+                className={`${isDarkMode ? "bg-amber-500/20 border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black" : "bg-white border-2 border-amber-500 text-amber-700 hover:bg-amber-500 hover:text-black shadow-md shadow-amber-100"} px-8 py-4 rounded-full text-lg font-bold shadow-lg transition-all duration-300`}
               >
                 Create Test
               </Link>
-              <Link to="/howitworks" className="px-8 py-4 rounded-full border-2 border-amber-500 text-amber-500 hover:bg-amber-500/10 transition-colors duration-300 font-semibold">
+              <Link to="/howitworks" className={`${isDarkMode ? "border-2 border-amber-500 text-amber-500 hover:bg-amber-500/10" : "border-2 border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-400 shadow-sm"} px-8 py-4 rounded-full text-lg font-semibold transition-colors duration-300`}>
                 How It Works
               </Link>
             </div>
@@ -438,15 +454,13 @@ const Edusphere = () => {
       </div>
 
       {/* Footer Section */}
-      <footer className={`py-6 mt-12 ${isDarkMode ? 'bg-gray-900/80 border-t border-gray-800 text-white' : 'bg-white/90 border-t border-amber-200/60'}`}>
+      <footer className={`py-6 mt-12 ${isDarkMode ? 'bg-gray-900/80 border-t border-gray-800 text-white' : 'bg-white/85 border-t border-slate-200/80 text-slate-600'}`}>
         <div className="flex justify-center items-center space-x-6">
-          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600'} font-medium hover:underline`}>About Us</button>
-          <span className={isDarkMode ? 'text-yellow-600' : 'text-amber-300'}>|</span>
-          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600'} font-medium hover:underline`}>Contact Us</button>
-          <span className={isDarkMode ? 'text-yellow-600' : 'text-amber-300'}>|</span>
-          <p className={isDarkMode ? 'text-yellow-600' : 'text-gray-500 text-sm'}>
-            © 2025 Edusphere. All Rights Reserved.
-          </p>
+          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600 font-semibold'} hover:underline`}>About Us</button>
+          <span className={isDarkMode ? 'text-yellow-600' : 'text-slate-300'}>|</span>
+          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600 font-semibold'} hover:underline`}>Contact Us</button>
+          <span className={isDarkMode ? 'text-yellow-600' : 'text-slate-300'}>|</span>
+          <p className={isDarkMode ? 'text-yellow-600' : 'text-slate-500 text-sm'}>© 2025 Edusphere. All Rights Reserved.</p>
         </div>
       </footer>
     </div>

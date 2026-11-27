@@ -447,11 +447,17 @@ const CreateTest = () => {
       className={`min-h-screen ${
         isDarkMode
           ? "bg-gradient-to-br from-black via-gray-900 to-gray-800 text-gray-100"
-          : "bg-gradient-to-br from-amber-50 via-white to-yellow-50 text-gray-900"
+          : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
       } transition-colors duration-300`}
     >
       {/* Top Navbar */}
-      <nav className="flex justify-between items-center p-6 border-b border-amber-500/20 backdrop-blur-md sticky top-0 z-40 bg-opacity-80">
+      <nav
+        className={`flex justify-between items-center p-6 border-b ${
+          isDarkMode
+            ? "border-amber-500/20 bg-black/40"
+            : "border-slate-200/80 bg-white/85 shadow-sm"
+        } backdrop-blur-md sticky top-0 z-40`}
+      >
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate("/")}>
           <img
             src="/images/Edusphere logo.png"
@@ -465,21 +471,41 @@ const CreateTest = () => {
 
         <div className="flex items-center space-x-6">
           <div className="hidden md:flex space-x-8">
-            <Link to="/educatorhome" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link
+              to="/educatorhome"
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
+            >
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/createcourses" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link
+              to="/createcourses"
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
+            >
               Create Courses
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/tests" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link
+              to="/tests"
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
+            >
               Test Facility
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/create-test" className="group relative text-lg font-semibold text-amber-400">
+            <Link
+              to="/create-test"
+              className={`group relative text-lg font-semibold ${
+                isDarkMode ? "text-amber-400" : "text-amber-600"
+              }`}
+            >
               Create Test
-              <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-amber-400"></span>
+              <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-amber-500"></span>
             </Link>
           </div>
 
@@ -603,7 +629,9 @@ const CreateTest = () => {
           {/* Card 1: Test Metadata */}
           <div
             className={`rounded-3xl p-8 border shadow-xl mb-8 ${
-              isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-amber-200"
+              isDarkMode
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white/95 border-slate-200/90 shadow-xl shadow-slate-100/90"
             }`}
           >
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-400 mb-2">
@@ -868,7 +896,9 @@ const CreateTest = () => {
           {/* Card 2: Question Bank Builder */}
           <div
             className={`rounded-3xl p-8 border shadow-xl mb-8 ${
-              isDarkMode ? "bg-gray-900 border-gray-800" : "bg-white border-amber-200"
+              isDarkMode
+                ? "bg-gray-900 border-gray-800"
+                : "bg-white/95 border-slate-200/90 shadow-xl shadow-slate-100/90"
             }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -962,7 +992,9 @@ const CreateTest = () => {
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`rounded-2xl p-6 border relative ${
-                      isDarkMode ? "bg-gray-800/60 border-gray-700" : "bg-amber-50/50 border-amber-200"
+                      isDarkMode
+                        ? "bg-gray-800/60 border-gray-700"
+                        : "bg-slate-50/80 border-slate-200/90 shadow-sm"
                     }`}
                   >
                     {/* Header */}

@@ -175,7 +175,7 @@ const Edusphere = () => {
       <div
         className={`relative min-h-screen ${isDarkMode
             ? "bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900"
-            : "bg-gradient-to-br from-blue-50 via-amber-50 to-blue-50"
+            : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
           } 
         transition-all duration-500`}
       >
@@ -429,39 +429,39 @@ const Edusphere = () => {
         <div className="border-b-4 border-amber-300"></div>
 
         {/* <!-- Achievement Cards Section --> */}
-        <section class={`bg-gray-800 py-16 ${isDarkMode ? "bg-gray-800" : "bg-gradient-to-br from-blue-50 via-amber-50 to-blue-50"}`}>
-          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <section className={`py-16 ${isDarkMode ? "bg-gray-800" : "bg-gradient-to-br from-slate-50 via-white to-amber-50/20"}`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* <!-- Courses Card --> */}
-              <motion.div class="bg-gray-200 rounded-xl shadow-md overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-lg hover:bg-amber-500">
-                <div class="p-8 text-center">
-                  <div class="flex justify-center">
-                    <i class="fas fa-book-open text-4xl text-blue-600 mb-4"></i>
+              <motion.div className={`rounded-2xl border shadow-md overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${isDarkMode ? "bg-gray-900/90 border-gray-800" : "bg-white/95 border-slate-200/90 shadow-slate-200/50"}`}>
+                <div className="p-8 text-center">
+                  <div className="flex justify-center">
+                    <i className="fas fa-book-open text-4xl text-amber-500 mb-4"></i>
                   </div>
-                  <h3 class="text-3xl font-bold text-gray-900 mb-2">100+ Courses</h3>
-                  <p class="text-gray-600">Explore diverse subjects and skills</p>
+                  <h3 className={`text-3xl font-extrabold mb-2 ${isDarkMode ? "text-white" : "text-slate-900"}`}>100+ Courses</h3>
+                  <p className={isDarkMode ? "text-gray-400" : "text-slate-600"}>Explore diverse subjects and skills</p>
                 </div>
               </motion.div>
 
               {/* <!-- Students Card --> */}
-              <div class="bg-gray-200 rounded-xl shadow-md overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-lg">
-                <div class="p-8 text-center">
-                  <div class="flex justify-center">
-                    <i class="fas fa-users text-4xl text-green-600 mb-4"></i>
+              <div className={`rounded-2xl border shadow-md overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${isDarkMode ? "bg-gray-900/90 border-gray-800" : "bg-white/95 border-slate-200/90 shadow-slate-200/50"}`}>
+                <div className="p-8 text-center">
+                  <div className="flex justify-center">
+                    <i className="fas fa-users text-4xl text-emerald-500 mb-4"></i>
                   </div>
-                  <h3 class="text-3xl font-bold text-gray-900 mb-2">50,000+ Students</h3>
-                  <p class="text-gray-600">Join our global learning community</p>
+                  <h3 className={`text-3xl font-extrabold mb-2 ${isDarkMode ? "text-white" : "text-slate-900"}`}>50,000+ Students</h3>
+                  <p className={isDarkMode ? "text-gray-400" : "text-slate-600"}>Join our global learning community</p>
                 </div>
               </div>
 
               {/* <!-- Experience Card --> */}
-              <div class="bg-gray-200 rounded-xl shadow-md overflow-hidden transition-transform duration-300 hover:-translate-y-2 hover:shadow-lg">
-                <div class="p-8 text-center">
-                  <div class="flex justify-center">
-                    <i class="fas fa-clock text-4xl text-red-600 mb-4"></i>
+              <div className={`rounded-2xl border shadow-md overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-xl ${isDarkMode ? "bg-gray-900/90 border-gray-800" : "bg-white/95 border-slate-200/90 shadow-slate-200/50"}`}>
+                <div className="p-8 text-center">
+                  <div className="flex justify-center">
+                    <i className="fas fa-clock text-4xl text-amber-500 mb-4"></i>
                   </div>
-                  <h3 class="text-3xl font-bold text-gray-900 mb-2">15+ Years</h3>
-                  <p class="text-gray-600">Of educational excellence</p>
+                  <h3 className={`text-3xl font-extrabold mb-2 ${isDarkMode ? "text-white" : "text-slate-900"}`}>15+ Years</h3>
+                  <p className={isDarkMode ? "text-gray-400" : "text-slate-600"}>Of educational excellence</p>
                 </div>
               </div>
             </div>

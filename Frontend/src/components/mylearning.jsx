@@ -237,13 +237,20 @@ const MyLearningPage = () => {
 
   return (
     <div
-      className={`${isDarkMode
-          ? "bg-gradient-to-r from-black to-gray-700 text-white"
-          : "bg-gradient-to-r from-yellow-100 to-white text-black"
-        } transition-colors duration-300`}
+      className={`min-h-screen ${
+        isDarkMode
+          ? "bg-gradient-to-br from-black via-gray-900 to-gray-800 text-gray-100"
+          : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
+      } transition-colors duration-300`}
     >
       {/* Navigation Header */}
-      <nav className="flex justify-between items-center p-6">
+      <nav
+        className={`flex justify-between items-center p-6 border-b ${
+          isDarkMode
+            ? "border-amber-500/20 bg-black/40"
+            : "border-slate-200/80 bg-white/85 shadow-sm"
+        } backdrop-blur-md sticky top-0 z-40`}
+      >
         <div className="flex items-center space-x-2">
           <img
             src="/images/Edusphere logo.png"
@@ -251,40 +258,48 @@ const MyLearningPage = () => {
             className="w-12 h-12 rounded-full shadow-lg"
           />
 
-          <h1 className="text-4xl font-bold ">Edusphere</h1>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent">Edusphere</h1>
         </div>
         <div className="flex items-center space-x-8">
           <div className="flex space-x-8">
             <Link
               to={isEducator ? "/educatorhome" : "/studenthome"}
-              className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
             >
               Home
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
             <Link
               to="/courses"
-              className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
             >
               Courses
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
             {!isEducator && (
               <Link
                 to="/my-test-marks"
-                className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
+                className={`group relative text-lg font-medium ${
+                  isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+                } transition-colors`}
               >
                 Test Review
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
               </Link>
             )}
             {!isEducator && (
               <Link
                 to="/contest"
-                className="group relative text-lg font-medium hover:text-amber-300 transition-colors"
+                className={`group relative text-lg font-medium ${
+                  isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+                } transition-colors`}
               >
                 Contest
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-300 group-hover:w-full transition-all duration-300"></span>
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
               </Link>
             )}
           </div>
@@ -328,18 +343,23 @@ const MyLearningPage = () => {
           <ThreeLineMenu isEducator={isEducator} isDarkMode={isDarkMode} />
         </div>
       </nav>
-      <div className="border-b-4 border-gold"></div>
 
-
-      <div className="pt-32 px-8 pb-12 max-w-7xl mx-auto">
+      <div className="pt-12 px-8 pb-16 max-w-7xl mx-auto">
         <div className="mb-12 text-center">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className={`text-4xl font-bold mb-4 ${darkMode ? 'text-white' : 'text-amber-300'}`}
+            className={`text-4xl md:text-5xl font-black mb-4 ${
+              isDarkMode
+                ? "text-white"
+                : "bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 bg-clip-text text-transparent"
+            }`}
           >
             My Learning
           </motion.h1>
+          <p className={`text-base max-w-2xl mx-auto mb-8 ${isDarkMode ? "text-gray-300" : "text-slate-600"}`}>
+            Track your ongoing progress, access enrolled course lectures, and review study materials with lifetime access.
+          </p>
 
           <div className="relative max-w-2xl mx-auto">
             <input
@@ -347,12 +367,13 @@ const MyLearningPage = () => {
               placeholder="Search your courses..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full px-6 py-3 rounded-xl border ${darkMode
-                  ? 'bg-gray-800 border-gray-700 text-white'
-                  : 'bg-white border-gray-200 text-gray-900'
-                } pr-12 transition-all`}
+              className={`w-full px-6 py-3.5 rounded-xl border ${
+                isDarkMode
+                  ? "bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+                  : "bg-white/95 border-slate-200 text-slate-900 placeholder-slate-400 shadow-sm focus:border-amber-400"
+              } pr-12 transition-all focus:outline-none`}
             />
-            <FiBookOpen className={`absolute right-4 top-3.5 text-xl ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+            <FiBookOpen className={`absolute right-4 top-4 text-xl ${isDarkMode ? "text-gray-400" : "text-amber-500"}`} />
           </div>
         </div>
 
@@ -364,8 +385,11 @@ const MyLearningPage = () => {
               initial="offscreen"
               whileInView="onscreen"
               viewport={{ once: true, amount: 0.2 }}
-              className={`group relative rounded-2xl overflow-hidden shadow-lg ${darkMode ? 'bg-gray-800' : 'bg-white'
-                }`}
+              className={`group relative rounded-2xl overflow-hidden transition-all duration-300 ${
+                isDarkMode
+                  ? "bg-gray-800/90 border border-gray-700 shadow-lg"
+                  : "bg-white/95 border border-slate-200/90 shadow-xl shadow-slate-200/50 hover:border-amber-300 hover:shadow-amber-100/60"
+              }`}
             >
               <div className="relative h-48 overflow-hidden">
                 <img
@@ -390,30 +414,30 @@ const MyLearningPage = () => {
                 <div className="flex items-center justify-between mb-4">
                 {
                 course.category.map((category, index) => (
-                <span className={`px-3 py-1 rounded-full text-sm ${
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                   isDarkMode ?
-                  'bg-purple-400/30 text-purple-900' :
-                  'bg-purple-100 text-purple-600'
+                  'bg-amber-400/20 text-amber-300 border border-amber-400/30' :
+                  'bg-amber-50 text-amber-700 border border-amber-200'
                 }`}>
                   {category}
                 </span>
                 ))}
                   <div className="flex items-center gap-2 text-sm">
-                    <FiClock className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`} />
-                    <span className={darkMode ? 'text-gray-300' : 'text-gray-600'}>{course.updatedAt.slice(0,10)}</span>
+                    <FiClock className={isDarkMode ? 'text-gray-400' : 'text-slate-500'} />
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-slate-600'}>{course.updatedAt.slice(0,10)}</span>
                   </div>
                 </div>
 
-                <h3 className={`text-lg font-semibold mb-3 ${darkMode ? 'text-white' : 'text-gray-900'
+                <h3 className={`text-lg font-bold mb-3 ${isDarkMode ? 'text-white' : 'text-slate-900'
                   }`}>
                   {course.title}
                 </h3>
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${course.course_price === 0 ? 'bg-green-500' : 'bg-blue-500'
+                    <div className={`w-2.5 h-2.5 rounded-full ${course.course_price === 0 ? 'bg-emerald-500' : 'bg-blue-500'
                       }`} />
-                    <span className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-slate-600'
                       }`}>
                       {course.course_price === 0 ? 'Completed' : 'In Progress'}
                     </span>
@@ -421,10 +445,11 @@ const MyLearningPage = () => {
 
                   <button
                     onClick={() => handleVisitCourse(course)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${darkMode
-                        ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                        : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                      }`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition-all ${
+                      isDarkMode
+                        ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                        : 'bg-amber-500 hover:bg-amber-600 text-white shadow-md shadow-amber-500/20'
+                    }`}
                   >
                     Continue
                     <FiChevronRight className="text-lg" />

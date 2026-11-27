@@ -158,11 +158,17 @@ const TestList = () => {
       className={`min-h-screen w-full overflow-y-auto overflow-x-hidden ${
         isDarkMode
           ? "bg-gradient-to-br from-black via-gray-900 to-gray-800 text-gray-100"
-          : "bg-gradient-to-br from-amber-50 via-white to-yellow-50 text-gray-900"
+          : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
       } transition-colors duration-300`}
     >
       {/* Top Navbar */}
-      <nav className="flex justify-between items-center p-6 border-b border-amber-500/20 backdrop-blur-md sticky top-0 z-40 bg-opacity-80">
+      <nav
+        className={`flex justify-between items-center p-6 border-b ${
+          isDarkMode
+            ? "border-amber-500/20 bg-black/40"
+            : "border-slate-200/80 bg-white/85 shadow-sm"
+        } backdrop-blur-md sticky top-0 z-40`}
+      >
         <div className="flex items-center space-x-3 cursor-pointer" onClick={() => navigate("/")}>
           <img
             src="/images/Edusphere logo.png"
@@ -176,20 +182,40 @@ const TestList = () => {
 
         <div className="flex items-center space-x-6">
           <div className="hidden md:flex space-x-8">
-            <Link to={isEducator ? "/educatorhome" : "/studenthome"} className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link
+              to={isEducator ? "/educatorhome" : "/studenthome"}
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
+            >
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/courses" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+            <Link
+              to="/courses"
+              className={`group relative text-lg font-medium ${
+                isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+              } transition-colors`}
+            >
               Courses
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/tests" className="group relative text-lg font-semibold text-amber-400">
+            <Link
+              to="/tests"
+              className={`group relative text-lg font-semibold ${
+                isDarkMode ? "text-amber-400" : "text-amber-600"
+              }`}
+            >
               Tests
-              <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-amber-400"></span>
+              <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-amber-500"></span>
             </Link>
             {!isEducator && (
-              <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-400 transition-colors">
+              <Link
+                to="/contest"
+                className={`group relative text-lg font-medium ${
+                  isDarkMode ? "hover:text-amber-400" : "text-slate-700 hover:text-amber-600 font-semibold"
+                } transition-colors`}
+              >
                 Contest
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-400 group-hover:w-full transition-all duration-300"></span>
               </Link>
@@ -277,7 +303,7 @@ const TestList = () => {
           className={`relative rounded-3xl p-8 md:p-12 overflow-hidden border ${
             isDarkMode
               ? "bg-gradient-to-r from-gray-900 via-gray-800 to-black border-amber-500/30"
-              : "bg-gradient-to-r from-amber-100 via-amber-50 to-white border-amber-300"
+              : "bg-gradient-to-r from-slate-50 via-white to-amber-50/50 border-slate-200/90 shadow-xl shadow-slate-100/90"
           } shadow-2xl`}
         >
           <div className="relative z-10 max-w-3xl">
@@ -398,7 +424,7 @@ const TestList = () => {
                   className={`rounded-2xl p-6 border flex flex-col justify-between transition-all ${
                     isDarkMode
                       ? "bg-gray-900/90 border-gray-800 hover:border-amber-400/50 shadow-lg"
-                      : "bg-white border-amber-200/80 hover:border-amber-400 shadow-md"
+                      : "bg-white/95 border-slate-200/90 shadow-xl shadow-slate-200/50 hover:border-amber-400 hover:shadow-amber-100/60"
                   }`}
                 >
                   <div>

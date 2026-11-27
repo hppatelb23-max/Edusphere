@@ -402,10 +402,10 @@ const CoursesPage = () => {
       className={`${
         isDarkMode
           ? "bg-gradient-to-r from-black to-gray-700 text-white"
-          : "bg-gradient-to-br from-amber-50 via-white to-yellow-50 text-gray-900"
+          : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
       } transition-colors duration-300`}
     >
-      <nav className={`flex justify-between items-center p-5 px-8 ${isDarkMode ? "bg-gray-900/80 border-b border-gray-700/50" : "bg-white/90 backdrop-blur-sm border-b border-amber-200/70 shadow-sm"} sticky top-0 z-40`}>
+      <nav className={`flex justify-between items-center p-5 px-8 ${isDarkMode ? "bg-gray-900/80 border-b border-gray-700/50" : "bg-white/85 backdrop-blur-md border-b border-slate-200/80 shadow-sm"} sticky top-0 z-40`}>
              <div className="flex items-center space-x-2">
                
                 <img src="/images/Edusphere logo.png" alt="Logo" className="w-12 h-12 rounded-full shadow-lg" />
@@ -416,26 +416,26 @@ const CoursesPage = () => {
              </div>
              <div className="flex items-center space-x-8">
                <div className="flex space-x-8">
-                 <Link to={isEducator ? "/educatorhome" : "/studenthome"} className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+                 <Link to={isEducator ? "/educatorhome" : "/studenthome"} className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
                                   Home
                                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
                                 </Link>
-                                <Link to="/courses" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+                                <Link to="/courses" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
                                   Courses
                                   <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
                                 </Link>
-            <Link to="/tests" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/tests" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
               Tests
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
             {!isEducator && (
-              <Link to="/my-test-marks" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+              <Link to="/my-test-marks" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
                 Test Review
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
               </Link>
             )}
             {!isEducator && (
-              <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+              <Link to="/contest" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
                 Contest
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
               </Link>
@@ -522,7 +522,7 @@ const CoursesPage = () => {
             className={`group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1 ${
               isDarkMode
                 ? 'bg-gray-800 shadow-xl shadow-black/30'
-                : 'bg-white shadow-xl shadow-amber-100/70 border border-amber-200/60 hover:border-amber-300 hover:shadow-amber-200/60'
+                : 'bg-white/95 shadow-xl shadow-slate-100/90 border border-slate-200/90 hover:border-amber-300 hover:shadow-2xl hover:shadow-amber-100/60'
             }`}
           >
             <div className="relative h-60 overflow-hidden">
@@ -590,26 +590,30 @@ const CoursesPage = () => {
 
                     <div className="grid grid-cols-2 gap-2">
                       {/* 1. ETH Badge (FIRST) */}
-                      <div className="flex items-center gap-2 p-2 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 shadow-sm">
+                      <div className={`flex items-center gap-2 p-2 rounded-xl shadow-sm ${
+                        isDarkMode ? "bg-amber-500/15 border border-amber-500/40 text-amber-300" : "bg-amber-50 border border-amber-300 text-amber-900"
+                      }`}>
                         <div className="w-7 h-7 rounded-lg bg-amber-400 text-black font-black text-xs flex items-center justify-center shrink-0 shadow">
                           Ξ
                         </div>
                         <div className="min-w-0">
-                          <span className="text-[10px] text-amber-400/80 uppercase font-bold block leading-tight">ETH</span>
-                          <span className="text-sm font-black text-white font-mono tracking-tight block truncate">
+                          <span className={`text-[10px] uppercase font-bold block leading-tight ${isDarkMode ? "text-amber-400/80" : "text-amber-800"}`}>ETH</span>
+                          <span className={`text-sm font-black font-mono tracking-tight block truncate ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                             {ethPrice} ETH
                           </span>
                         </div>
                       </div>
 
-                      {/* 2. UPI Badge (SECOND) — EXACT SAME FONT SIZE (text-sm font-black) */}
-                      <div className="flex items-center gap-2 p-2 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 shadow-sm">
+                      {/* 2. UPI Badge (SECOND) */}
+                      <div className={`flex items-center gap-2 p-2 rounded-xl shadow-sm ${
+                        isDarkMode ? "bg-emerald-500/15 border border-emerald-500/40 text-emerald-300" : "bg-emerald-50 border border-emerald-300 text-emerald-900"
+                      }`}>
                         <div className="w-7 h-7 rounded-lg bg-emerald-400 text-black font-black text-xs flex items-center justify-center shrink-0 shadow">
                           ₹
                         </div>
                         <div className="min-w-0">
-                          <span className="text-[10px] text-emerald-400/80 uppercase font-bold block leading-tight">UPI</span>
-                          <span className="text-sm font-black text-white font-mono tracking-tight block truncate">
+                          <span className={`text-[10px] uppercase font-bold block leading-tight ${isDarkMode ? "text-emerald-400/80" : "text-emerald-800"}`}>UPI</span>
+                          <span className={`text-sm font-black font-mono tracking-tight block truncate ${isDarkMode ? "text-white" : "text-slate-900"}`}>
                             ₹{Number(upiPrice).toLocaleString("en-IN")}
                           </span>
                         </div>

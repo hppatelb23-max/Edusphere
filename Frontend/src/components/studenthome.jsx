@@ -268,11 +268,11 @@ const Studenthome = () => {
     <div
       className={`${isDarkMode
           ? "bg-gradient-to-r from-black to-gray-700 text-gold"
-          : "bg-gradient-to-br from-amber-50 via-white to-yellow-50 text-gray-900"
+          : "bg-gradient-to-br from-slate-50 via-white to-amber-50/30 text-slate-900"
         } transition-colors duration-300`}
     >
       {/* Navbar Section */}
-      <nav className={`flex justify-between items-center p-5 px-8 ${isDarkMode ? "bg-gray-900/80 border-b border-gray-700/50" : "bg-white/90 backdrop-blur-sm border-b border-amber-200/70 shadow-sm"} sticky top-0 z-40`}>
+      <nav className={`flex justify-between items-center p-5 px-8 ${isDarkMode ? "bg-gray-900/80 border-b border-gray-700/50" : "bg-white/85 backdrop-blur-md border-b border-slate-200/80 shadow-sm"} sticky top-0 z-40`}>
         <div className="flex items-center space-x-2">
 
           <img src="/images/Edusphere logo.png" alt="Logo" className="w-12 h-12 rounded-full shadow-lg" />
@@ -283,23 +283,23 @@ const Studenthome = () => {
         </div>
         <div className="flex items-center space-x-8">
           <div className="flex space-x-8">
-            <Link to="/studenthome" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/studenthome" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
               Home
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/courses" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/courses" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
               Courses
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/tests" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/tests" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
               Tests
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/my-test-marks" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/my-test-marks" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
               Test Review
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
-            <Link to="/contest" className="group relative text-lg font-medium hover:text-amber-500 transition-colors">
+            <Link to="/contest" className={`group relative text-lg font-medium transition-colors ${isDarkMode ? "hover:text-amber-500" : "text-slate-700 hover:text-amber-600 font-semibold"}`}>
               Contest
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-amber-500 group-hover:w-full transition-all duration-300"></span>
             </Link>
@@ -307,9 +307,13 @@ const Studenthome = () => {
 
           {/* Student Indian Rupee Balance Badge */}
           {walletConnected && (
-            <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-bold shadow-sm">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-emerald-300/80">Online Money Available:</span>
-              <span className="font-black text-sm text-emerald-300">₹{Number(inrBalance).toLocaleString("en-IN")}</span>
+            <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-bold shadow-sm ${
+              isDarkMode
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                : "bg-emerald-50 border-emerald-300 text-emerald-800"
+            }`}>
+              <span className={`font-mono text-[10px] uppercase tracking-wider ${isDarkMode ? "text-emerald-300/80" : "text-emerald-700"}`}>Online Money Available:</span>
+              <span className={`font-black text-sm ${isDarkMode ? "text-emerald-300" : "text-emerald-700"}`}>₹{Number(inrBalance).toLocaleString("en-IN")}</span>
             </div>
           )}
 
@@ -356,7 +360,7 @@ const Studenthome = () => {
           <ThreeLineMenu isEducator={false} />
         </div>
       </nav>
-      <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-amber-200/60"}></div>
+      <div className={isDarkMode ? "border-b border-gray-700/50" : "border-b border-slate-200/80"}></div>
 
       {/* Main Content Section */}
       <div className="container mx-auto py-14 px-6 relative">
@@ -370,24 +374,24 @@ const Studenthome = () => {
             />
           </div>
           <div className="lg:w-1/2 space-y-8 animate-fade-in-up delay-100">
-            <h2 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent leading-tight">
+            <h2 className={`text-5xl md:text-6xl font-extrabold leading-tight ${isDarkMode ? "bg-gradient-to-r from-amber-500 to-amber-300 bg-clip-text text-transparent" : "bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-600 bg-clip-text text-transparent"}`}>
               Revolutionizing Education with Blockchain
             </h2>
-            <p className={`text-xl leading-relaxed ${isDarkMode ? "text-white" : "text-gray-700"}`}>
+            <p className={`text-xl leading-relaxed ${isDarkMode ? "text-gray-300" : "text-slate-600 font-normal"}`}>
               Empower your learning journey with decentralized education. Take control of your academic credentials,
               earn rewards for your achievements, and access a world of knowledge powered by Web3 technology.
             </p>
             <div className="flex flex-wrap gap-4">
-              <Link to="/courses" className="bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-white px-8 py-4 rounded-full text-lg font-semibold shadow-lg hover:shadow-amber-500/30 transition-all duration-300">
+              <Link to="/courses" className={`${isDarkMode ? "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-white shadow-amber-500/30" : "bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-600 hover:to-amber-500 text-slate-950 shadow-amber-500/25"} px-8 py-4 rounded-full text-lg font-bold shadow-lg transition-all duration-300`}>
                 Explore Courses
               </Link>
-              <Link to="/tests" className="bg-amber-500/20 border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black px-8 py-4 rounded-full text-lg font-semibold shadow-lg transition-all duration-300">
+              <Link to="/tests" className={`${isDarkMode ? "bg-amber-500/20 border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black" : "bg-white border-2 border-amber-500 text-amber-700 hover:bg-amber-500 hover:text-black shadow-md shadow-amber-100"} px-8 py-4 rounded-full text-lg font-bold shadow-lg transition-all duration-300`}>
                 Give Tests
               </Link>
-              <Link to="/my-test-marks" className="bg-emerald-500/20 border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-black px-8 py-4 rounded-full text-lg font-semibold shadow-lg transition-all duration-300">
+              <Link to="/my-test-marks" className={`${isDarkMode ? "bg-emerald-500/20 border-2 border-emerald-400 text-emerald-400 hover:bg-emerald-400 hover:text-black" : "bg-white border-2 border-emerald-500 text-emerald-700 hover:bg-emerald-500 hover:text-black shadow-md shadow-emerald-100"} px-8 py-4 rounded-full text-lg font-bold shadow-lg transition-all duration-300`}>
                 Test Review
               </Link>
-              <Link to="/howitworks" className="px-8 py-4 rounded-full border-2 border-amber-500 text-amber-500 hover:bg-amber-500/10 transition-colors duration-300 font-semibold">
+              <Link to="/howitworks" className={`${isDarkMode ? "border-2 border-amber-500 text-amber-500 hover:bg-amber-500/10" : "border-2 border-slate-300 bg-white text-slate-700 hover:bg-slate-100 hover:border-slate-400 shadow-sm"} px-8 py-4 rounded-full text-lg font-semibold transition-colors duration-300`}>
                 How It Works
               </Link>
             </div>
@@ -396,13 +400,13 @@ const Studenthome = () => {
       </div>
 
       {/* Footer Section */}
-      <footer className={`py-6 mt-12 ${isDarkMode ? 'bg-gray-900/80 border-t border-gray-800 text-white' : 'bg-white/90 border-t border-amber-200/60'}`}>
+      <footer className={`py-6 mt-12 ${isDarkMode ? 'bg-gray-900/80 border-t border-gray-800 text-white' : 'bg-white/85 border-t border-slate-200/80 text-slate-600'}`}>
         <div className="flex justify-center items-center space-x-6">
-          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600'} font-medium hover:underline`}>About Us</button>
-          <span className={isDarkMode ? 'text-yellow-600' : 'text-amber-300'}>|</span>
-          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600'} font-medium hover:underline`}>Contact Us</button>
-          <span className={isDarkMode ? 'text-yellow-600' : 'text-amber-300'}>|</span>
-          <p className={isDarkMode ? 'text-yellow-600' : 'text-gray-500 text-sm'}>© 2025 Edusphere. All Rights Reserved.</p>
+          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600 font-semibold'} hover:underline`}>About Us</button>
+          <span className={isDarkMode ? 'text-yellow-600' : 'text-slate-300'}>|</span>
+          <button className={`${isDarkMode ? 'text-yellow-500' : 'text-amber-600 font-semibold'} hover:underline`}>Contact Us</button>
+          <span className={isDarkMode ? 'text-yellow-600' : 'text-slate-300'}>|</span>
+          <p className={isDarkMode ? 'text-yellow-600' : 'text-slate-500 text-sm'}>© 2025 Edusphere. All Rights Reserved.</p>
         </div>
       </footer>
 
