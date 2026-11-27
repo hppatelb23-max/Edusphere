@@ -193,106 +193,74 @@ Edusphere bridges traditional Web2 payment comfort with decentralized Web3 smart
 
 ## 📱 Platform Screenshots & Feature Walkthrough
 
-### 1. Unified Transaction Ledger
-*Chronological transaction history sorting newest transactions first for both students and educators, with downloadable tax invoices.*
+### 1. Educator Real-Time Transaction Ledger (Sorted Newest-First)
+*Educators view a complete, chronologically sorted ledger of course enrollments, MetaMask ETH payments, UPI Rupee wallet deposits, and student purchaser names.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/942864bc-889e-413c-b24a-a78708be3ae3" alt="Transaction History" width="850">
+  <img src="./screenshots/01_educator_transaction_ledger.png" alt="Educator Transaction History" width="850">
 </p>
 
 ---
 
-### 2. Student Navigation & Top-Up Drawer
-*Quick-access drawer featuring real-time Rupee wallet balance, Add Money UPI options, My Learning, and Coin Redemption.*
+### 2. Student Transaction History & Downloadable Official Tax Invoices
+*Students can review all recent transactions in descending chronological order (newest first) and instantly download generated official tax invoices with unique IDs, GST calculations, and verifiable transaction hashes.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/62e9fdbb-84ab-4862-bdc9-d7f0956fc7eb" alt="Navigation Drawer" width="850">
+  <img src="./screenshots/02_student_transaction_ledger.png" alt="Student Transaction History & Invoices" width="850">
 </p>
 
 ---
 
-### 3. Educator Management Console
-*Dedicated educator navbar with streamlined controls for course creation, assessment design, student marks, and revenue statistics.*
+### 3. Student Account Drawer, UPI Wallet & Coin Redemption
+*Quick-access sidebar drawer displaying real-time Rupee wallet balance, Add Money via instant UPI/Cards, My Learning access, and platform Coin Redemption into Ethereum.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/730be69b-12db-4dd1-bff6-454cd1a509d1" alt="Educator Console" width="850">
+  <img src="./screenshots/03_student_account_drawer.png" alt="Student Account Drawer" width="450">
 </p>
 
 ---
 
-### 4. AI-Powered Question Generator
-*Generates formatted, curriculum-aligned MCQs directly from uploaded PDF and Word lecture notes.*
+### 4. Educator Dashboard & Revenue Indicator
+*Educator management bar featuring real-time online balance (`Online Money Available: ₹6,238`), wallet connectivity badge, and quick-navigation links for Create Courses, Create Test, Student Marks, and Test Facility.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/eb4640d7-845e-4f66-9d65-a4ea32e26b38" alt="AI Question Generator" width="850">
+  <img src="./screenshots/04_educator_dashboard_header.png" alt="Educator Dashboard Navigation" width="850">
 </p>
 
 ---
 
-### 5. Interactive Assessment Environment
-*Proctored test interface with active question timers, anti-cheat enforcement, and immediate solution reviews.*
+### 5. AI-Powered MCQ Assessment Generator from Lecture Notes
+*Automated question bank generation engine that analyzes uploaded syllabus, lecture notes, or reference documents (`.pdf`, `.docx`, `.txt`), formulating questions, verifying source material citations, and populating multiple-choice options with designated correct keys.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/007de288-87da-4f59-acd7-f703522065f5" alt="Assessment Environment" width="850">
+  <img src="./screenshots/05_ai_notes_test_generator.png" alt="AI Notes MCQ Generator" width="850">
 </p>
 
 ---
 
-### 6. Course Marketplace & Hybrid Pricing
-*Explore courses with real-time ETH and Rupee pricing, categories, and ratings.*
+### 6. Hybrid Checkout: Web3 MetaMask (ETH) & Web2 Rupee Wallet (UPI)
+*Flexible payment modal allowing learners to purchase courses using either cryptocurrency (ETH via MetaMask smart contract) or fiat balance (Rupee wallet charged via UPI), recording immutable ownership.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/b06fe1cd-6196-4901-83b4-71c0cc3b2991" alt="Course Marketplace" width="850">
+  <img src="./screenshots/06_course_purchase_hybrid_payment.png" alt="Course Purchase Hybrid Payment" width="850">
 </p>
 
 ---
 
-### 7. Course Media & Curriculum Player
-*Decentralized video playback powered by IPFS with structured lecture modules.*
+### 7. Educator Course Studio & Decentralized Media Upload
+*Educator dashboard for authoring structured modules, uploading video lessons to IPFS via Pinata, defining course categories, and configuring dual-currency pricing.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4319dc9a-e636-4bb0-aba7-4b8af3a59f89" alt="Course Player" width="850">
+  <img src="./screenshots/07_educator_course_studio.png" alt="Educator Course Studio" width="850">
 </p>
 
 ---
 
-### 8. Educator Course Creation Studio
-*Upload lectures, assign pricing models (ETH/INR), and publish courses to the decentralized ledger.*
+### 8. Edusphere Landing Page & Platform Overview
+*Platform introduction with interactive floating particle animations, high-contrast dark/light mode toggles, achievement metrics, and core feature explorations.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/2100a9fc-e16e-45ce-b4ee-8740893b78a5" alt="Course Creation Studio" width="850">
+  <img src="./screenshots/08_platform_landing_overview.png" alt="Edusphere Landing Page" width="850">
 </p>
 
 ---
 
-### 9. Student "My Learning" Portal
-*Students access all enrolled content with guaranteed lifetime access.*
+### 9. Web3 MetaMask Wallet Authentication & Role Selection
+*Cryptographic login system allowing users to connect their Web3 wallet and select their verified role as an Educator or Student.*
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/0e0cf2d3-2b14-46e5-a089-cb8efde7f0ab" alt="My Learning" width="850">
-</p>
-
----
-
-### 10. Student Assessment Analytics & Review
-*Detailed review of submitted answers with correct answer keys and explanations.*
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/6cd45fe8-2541-4529-8d78-51cc1c681282" alt="Student Review" width="850">
-</p>
-
----
-
-### 11. Rupee Wallet Recharge & UPI Gateway
-*Instant mock UPI gateway supporting payment simulation via QR code and UPI IDs.*
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/145ad1cb-dfaf-433c-8427-a5a3604aa1dc" alt="UPI Recharge" width="850">
-</p>
-
----
-
-### 12. Coin Redemption to Ethereum
-*Converts earned Edusphere reward coins into real ETH credited to the student's connected MetaMask address.*
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/7d3001e9-fdc5-4f66-9d65-a4ea32e26b38" alt="Coin Redemption" width="850">
-</p>
-
----
-
-### 13. Official Tax Invoice Generation
-*Downloadable, tamper-evident tax invoices for course purchases and balance top-ups.*
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/0a8fab1e-f44d-4537-a4fb-d415ec7e6db9" alt="Tax Invoice" width="850">
+  <img src="./screenshots/09_metamask_web3_authentication.png" alt="Web3 Authentication" width="850">
 </p>
 
 ---
