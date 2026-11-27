@@ -150,7 +150,6 @@ git clone <https://github.com/DARSHITSHAH-2906/Inheritance_Edusphere.git>
 ## 📱Screenshots
 ![Screenshot 2025-02-03 182142](https://github.com/user-attachments/assets/942864bc-889e-413c-b24a-a78708be3ae3)
 ![Screenshot 2025-02-03 182214](https://github.com/user-attachments/assets/62e9fdbb-84ab-4862-bdc9-d7f0956fc7eb)
-![Screenshot 2025-02-03 182243](https://github.com/user-attachments/assets/730be69b-12db-4dd1-bff6-454cd1a509d1)
 ![Screenshot 2025-02-03 182321](https://github.com/user-attachments/assets/eb4640d7-845e-4f66-9d65-a4ea32e26b38)
 ![Screenshot 2025-02-03 182346](https://github.com/user-attachments/assets/007de288-87da-4f59-acd7-f703522065f5)
 ![Screenshot 2025-02-03 182411](https://github.com/user-attachments/assets/b06fe1cd-6196-4901-83b4-71c0cc3b2991)
